@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Digital Corner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+    </style>
+</head>
+<body class="flex items-center justify-center h-screen bg-gray-900 relative overflow-hidden">
+    
+    <!-- Background Design Element -->
+    <div class="absolute top-0 right-0 w-[800px] h-[800px] bg-blue-600 rounded-full mix-blend-multiply filter blur-[150px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
+    <div class="absolute bottom-0 left-0 w-[600px] h-[600px] bg-emerald-500 rounded-full mix-blend-multiply filter blur-[150px] opacity-20 translate-y-1/2 -translate-x-1/2"></div>
+
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 relative z-10 mx-4 border border-gray-100">
+        <div class="text-center mb-8">
+            <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Digital Corner Logo" class="w-24 h-24 mx-auto rounded-xl object-contain shadow-sm border border-gray-100 mb-4 bg-white">
+            <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight">DIGITAL CORNER</h1>
+            <p class="text-sm text-gray-500 mt-1 font-medium">Enterprise Ledger & POS</p>
+        </div>
+
+        {% if error %}
+        <div class="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded mb-6 text-sm font-medium">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="/login" class="space-y-5">
+            <div>
+                <label class="block text-sm font-bold text-gray-700 mb-1">Username</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i data-lucide="user" class="w-5 h-5 text-gray-400"></i>
+                    </div>
+                    <input type="text" name="username" required class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition shadow-sm text-gray-900" placeholder="Enter username">
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-bold text-gray-700 mb-1">Password</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i data-lucide="lock" class="w-5 h-5 text-gray-400"></i>
+                    </div>
+                    <input type="password" name="password" required class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition shadow-sm text-gray-900" placeholder="••••••••">
+                </div>
+            </div>
+
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition shadow-lg mt-2 flex justify-center items-center gap-2">
+                Sign In <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+        </form>
+        
+        <div class="mt-8 pt-6 border-t border-gray-100 text-center">
+            <p class="text-xs text-gray-400 uppercase tracking-wider font-semibold">Powered by Pixara Web Solutions</p>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>

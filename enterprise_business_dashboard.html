@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Ledger & Dashboard</title>
+    
+    <!-- Tailwind & External Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- html2pdf for Premium Receipt Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        body { background-color: #f3f4f6; font-family: 'Inter', sans-serif; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        .nav-active { background-color: rgba(37, 99, 235, 0.2); color: #60a5fa; }
+        
+        /* Receipt Print Styles */
+        #receipt-container {
+            width: 800px;
+            padding: 40px;
+            background: white;
+            position: absolute;
+            left: -9999px; /* Hide off-screen */
+        }
+    </style>
+</head>
+<body class="text-gray-800 flex h-screen overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-gray-900 text-white flex flex-col hide-scroll overflow-y-auto hidden md:flex shrink-0">
+        <div class="p-6 flex items-center gap-3">
+            <i data-lucide="building-2" class="w-8 h-8 text-blue-400"></i>
+            <h1 class="text-xl font-bold tracking-wider">DIGITAL<br><span class="text-blue-400 text-sm">CORNER</span></h1>
+        </div>
+        <nav class="flex-1 px-4 mt-6 space-y-2" id="sidebarNav">
+            <button onclick="switchView('dashboard')" id="nav-dashboard" class="nav-active w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition hover:bg-gray-800 hover:text-white">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i> Dashboard
+            </button>
+            <button onclick="switchView('today')" id="nav-today" class="text-gray-300 w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition hover:bg-gray-800 hover:text-white">
+                <i data-lucide="calendar" class="w-5 h-5"></i> Today
+            </button>
+            <button onclick="switchView('transactions')" id="nav-transactions" class="text-gray-300 w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition hover:bg-gray-800 hover:text-white">
+                <i data-lucide="arrow-right-left" class="w-5 h-5"></i> All Transactions
+            </button>
+            <button onclick="switchView('eod')" id="nav-eod" class="text-gray-300 w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition hover:bg-gray-800 hover:text-white">
+                <i data-lucide="scale" class="w-5 h-5"></i> EOD Tally
+            </button>
+            <button onclick="switchView('reports')" id="nav-reports" class="text-gray-300 w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition hover:bg-gray-800 hover:text-white">
+                <i data-lucide="pie-chart" class="w-5 h-5"></i> Reports & Export
+            </button>
+        </nav>
+        <div class="p-4 text-xs text-green-400 text-center border-t border-gray-800 flex items-center justify-center gap-2">
+            <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> Cloud Sync Active
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden">
+        
+        <!-- Header -->
+        <header class="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center z-10 shrink-0">
+            <h2 id="headerTitle" class="text-2xl font-semibold text-gray-800">Command Center</h2>
+            <div class="flex items-center gap-3">
+                <button id="togglePrivacyBtn" class="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition border border-gray-300">
+                    <i data-lucide="eye-off" id="privacyIcon" class="w-5 h-5"></i>
+                    <span id="privacyText" class="font-medium text-sm hidden lg:block">Reveal</span>
+                </button>
+                <button onclick="openModal('transfer')" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition">
+                    <i data-lucide="arrow-right-left" class="w-5 h-5"></i> <span class="hidden lg:block">Transfer</span>
+                </button>
+                <button onclick="openModal('income')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition shadow-sm">
+                    <i data-lucide="plus-circle" class="w-5 h-5"></i> <span class="hidden lg:block">Inflow</span>
+                </button>
+                <button onclick="openModal('expense')" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition shadow-sm">
+                    <i data-lucide="minus-circle" class="w-5 h-5"></i> <span class="hidden lg:block">Outflow</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- VIEW: DASHBOARD -->
+        <div id="view-dashboard" class="view-section flex-1 overflow-y-auto p-8 space-y-6 hide-scroll">
+            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wide">Overall Balances (The Whole Image)</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div class="glass-panel p-5 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
+                    <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Total Corpus</p>
+                    <h3 class="text-2xl font-bold text-gray-900 mt-2 secure-data" id="kpi-corpus">₹ 0</h3>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden border-l-4 border-l-emerald-500">
+                    <p class="text-xs font-bold text-emerald-600 uppercase tracking-wide">Cash in Hand</p>
+                    <h3 class="text-2xl font-bold text-gray-900 mt-2 secure-data" id="kpi-cash">₹ 0</h3>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden border-l-4 border-l-purple-500">
+                    <p class="text-xs font-bold text-purple-600 uppercase tracking-wide">AEPS Float</p>
+                    <h3 class="text-2xl font-bold text-gray-900 mt-2 secure-data" id="kpi-aeps">₹ 0</h3>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden border-b-4 border-b-red-500">
+                    <p class="text-xs font-bold text-red-600 uppercase tracking-wide">Airtel mCash</p>
+                    <h3 class="text-2xl font-bold text-gray-900 mt-2 secure-data" id="kpi-airtel">₹ 0</h3>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
+                    <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Main Bank</p>
+                    <h3 class="text-2xl font-bold text-gray-900 mt-2 secure-data" id="kpi-bank">₹ 0</h3>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
+                <div class="glass-panel p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2 h-[350px]">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Inflow vs Outflow</h3>
+                    <canvas id="barChart"></canvas>
+                </div>
+                <div class="glass-panel p-6 rounded-2xl shadow-sm border border-gray-100 h-[350px]">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Revenue Breakdown</h3>
+                    <canvas id="doughnutChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: TODAY -->
+        <div id="view-today" class="view-section hidden flex-1 overflow-y-auto p-8 space-y-6 hide-scroll">
+            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wide mb-2">Today's Live Performance</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-green-500">
+                    <p class="text-xs font-bold text-gray-500 uppercase">Today's Inflow</p>
+                    <h3 class="text-2xl font-bold text-gray-900 mt-1 secure-data" id="today-inflow">₹ 0</h3>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-red-500">
+                    <p class="text-xs font-bold text-gray-500 uppercase">Today's Outflow</p>
+                    <h3 class="text-2xl font-bold text-gray-900 mt-1 secure-data" id="today-outflow">₹ 0</h3>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-blue-500">
+                    <p class="text-xs font-bold text-gray-500 uppercase">Today's Net Profit</p>
+                    <h3 class="text-2xl font-bold text-gray-900 mt-1 secure-data" id="today-net">₹ 0</h3>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-purple-500">
+                    <p class="text-xs font-bold text-gray-500 uppercase">AEPS/Transfer Volume</p>
+                    <h3 class="text-2xl font-bold text-gray-900 mt-1 secure-data" id="today-volume">₹ 0</h3>
+                </div>
+            </div>
+
+            <div class="glass-panel rounded-2xl shadow-sm border border-gray-100 overflow-hidden bg-white">
+                <div class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-800">Today's Entries</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="text-gray-500 text-sm uppercase tracking-wider shadow-sm">
+                                <th class="px-6 py-4 font-medium">Description</th>
+                                <th class="px-6 py-4 font-medium">Category</th>
+                                <th class="px-6 py-4 font-medium">Fund/Source</th>
+                                <th class="px-6 py-4 font-medium text-right">Amount</th>
+                                <th class="px-6 py-4 font-medium text-center">Receipt</th>
+                            </tr>
+                        </thead>
+                        <tbody id="todayTransactionsTable" class="divide-y divide-gray-100 text-gray-700"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: TRANSACTIONS (ALL) -->
+        <div id="view-transactions" class="view-section hidden flex-1 overflow-hidden flex flex-col p-8 hide-scroll">
+            <div class="glass-panel rounded-2xl shadow-sm border border-gray-100 flex flex-col flex-1 overflow-hidden bg-white">
+                <div class="p-4 border-b border-gray-100 bg-gray-50 flex gap-4 flex-wrap items-center">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="filter" class="w-5 h-5 text-gray-400"></i>
+                        <span class="text-sm font-medium text-gray-700">Filters:</span>
+                    </div>
+                    <input type="date" id="filterDate" class="px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500">
+                    <select id="filterCategory" class="px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500">
+                        <option value="">All Categories</option>
+                    </select>
+                    <select id="filterFund" class="px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500">
+                        <option value="">All Funds</option>
+                        <option value="Cash in Hand">Cash in Hand</option>
+                        <option value="AEPS Float">AEPS Float</option>
+                        <option value="Airtel Payments Bank">Airtel Payments Bank</option>
+                        <option value="Main Office Bank">Main Office Bank</option>
+                    </select>
+                    <button onclick="clearFilters()" class="text-sm text-blue-600 hover:text-blue-800 font-medium ml-auto">Clear Filters</button>
+                </div>
+                <div class="overflow-y-auto flex-1">
+                    <table class="w-full text-left border-collapse relative">
+                        <thead class="sticky top-0 bg-gray-50 z-10">
+                            <tr class="text-gray-500 text-sm uppercase tracking-wider shadow-sm">
+                                <th class="px-6 py-4 font-medium">Date</th>
+                                <th class="px-6 py-4 font-medium">Description</th>
+                                <th class="px-6 py-4 font-medium">Category</th>
+                                <th class="px-6 py-4 font-medium">Fund/Source</th>
+                                <th class="px-6 py-4 font-medium text-right">Amount</th>
+                                <th class="px-6 py-4 font-medium text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionsTable" class="divide-y divide-gray-100 text-gray-700"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: EOD RECONCILIATION -->
+        <div id="view-eod" class="view-section hidden flex-1 overflow-y-auto p-8 hide-scroll">
+            <div class="glass-panel p-8 rounded-2xl shadow-sm border border-gray-100 bg-white max-w-3xl mx-auto">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="p-3 bg-blue-100 rounded-lg"><i data-lucide="scale" class="w-6 h-6 text-blue-600"></i></div>
+                    <div>
+                        <h3 class="text-2xl font-bold text-gray-800">End of Day Cash Tally</h3>
+                        <p class="text-gray-500 text-sm">Compare physical drawer cash against digital ledger expectations.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-8 mb-8">
+                    <!-- Cash in Hand Tally -->
+                    <div class="border border-gray-200 rounded-xl p-5 bg-gray-50">
+                        <h4 class="font-bold text-gray-700 mb-4 border-b pb-2">Cash in Hand (Counter)</h4>
+                        <div class="flex justify-between text-sm mb-2"><span class="text-gray-500">Expected Ledger Balance:</span> <strong id="eod-expected-cash" class="text-gray-900">₹ 0</strong></div>
+                        <div class="mt-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Physical Cash Count (₹)</label>
+                            <input type="number" id="physical-cash" oninput="calculateVariance('cash')" class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500" placeholder="Enter actual cash counted">
+                        </div>
+                        <div class="flex justify-between text-sm mt-4 font-bold items-center">
+                            <span class="text-gray-600">Variance:</span> 
+                            <span id="var-cash" class="text-gray-400 px-3 py-1 rounded-md bg-gray-200">₹ 0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- AEPS Float Tally -->
+                    <div class="border border-gray-200 rounded-xl p-5 bg-gray-50">
+                        <h4 class="font-bold text-gray-700 mb-4 border-b pb-2">AEPS Float (Drawer)</h4>
+                        <div class="flex justify-between text-sm mb-2"><span class="text-gray-500">Expected Ledger Balance:</span> <strong id="eod-expected-aeps" class="text-gray-900">₹ 0</strong></div>
+                        <div class="mt-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Physical Cash Count (₹)</label>
+                            <input type="number" id="physical-aeps" oninput="calculateVariance('aeps')" class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500" placeholder="Enter actual cash counted">
+                        </div>
+                        <div class="flex justify-between text-sm mt-4 font-bold items-center">
+                            <span class="text-gray-600">Variance:</span> 
+                            <span id="var-aeps" class="text-gray-400 px-3 py-1 rounded-md bg-gray-200">₹ 0.00</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <button onclick="settleVariances()" class="w-full bg-gray-900 hover:bg-black text-white py-3 rounded-lg font-bold text-lg transition shadow-md flex items-center justify-center gap-2">
+                    <i data-lucide="shield-check" class="w-5 h-5"></i> Log Adjustments & Close Day
+                </button>
+            </div>
+        </div>
+
+        <!-- VIEW: REPORTS -->
+        <div id="view-reports" class="view-section hidden flex-1 overflow-y-auto p-8 hide-scroll">
+            <div class="glass-panel p-8 rounded-2xl shadow-sm border border-gray-100 bg-white max-w-2xl">
+                <h3 class="text-2xl font-bold text-gray-800 mb-2">Export Data</h3>
+                <p class="text-gray-500 mb-8">Generate a full CSV backup of your ledger. This file can be opened in Excel, Tally, or any spreadsheet tool.</p>
+                <button onclick="exportCSV()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2 transition shadow-sm w-full justify-center text-lg">
+                    <i data-lucide="download" class="w-6 h-6"></i> Download Ledger as CSV
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Hidden Premium Receipt Template -->
+    <div id="receipt-container">
+        <div id="receipt-content" class="border border-gray-200 rounded-xl p-8 bg-white relative">
+            <div class="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -z-10"></div>
+            <!-- Header -->
+            <div class="flex justify-between items-start border-b-2 border-gray-100 pb-6 mb-6">
+                <div>
+                    <h1 class="text-3xl font-extrabold tracking-tight text-gray-900">DIGITAL CORNER</h1>
+                    <p class="text-sm text-gray-500 mt-1">Laluk Bus Stand, Laluk</p>
+                    <p class="text-sm text-gray-500">North Lakhimpur, Assam, 784160</p>
+                </div>
+                <div class="text-right">
+                    <h2 class="text-xl font-bold text-blue-600 uppercase tracking-widest">RECEIPT</h2>
+                    <p class="text-sm font-medium text-gray-600 mt-2">Date: <span id="rcpt-date"></span></p>
+                    <p class="text-sm text-gray-400">Txn ID: <span id="rcpt-id" class="uppercase"></span></p>
+                </div>
+            </div>
+            <!-- Body -->
+            <div class="mb-8">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Billed To / Description</h3>
+                <p class="text-lg font-semibold text-gray-800" id="rcpt-desc"></p>
+                <p class="text-sm text-gray-500 mt-1">Category: <span id="rcpt-cat" class="font-medium text-gray-700"></span></p>
+            </div>
+            
+            <table class="w-full text-left border-collapse mb-8">
+                <thead>
+                    <tr class="bg-gray-50 text-gray-500 text-sm uppercase">
+                        <th class="py-3 px-4 rounded-l-lg">Service Detail</th>
+                        <th class="py-3 px-4 text-right rounded-r-lg">Total Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="border-b border-gray-100">
+                        <td class="py-4 px-4 text-gray-800 font-medium">Payment Received</td>
+                        <td class="py-4 px-4 text-right text-lg font-bold text-gray-900" id="rcpt-amt"></td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="flex justify-between items-end mt-12 pt-6 border-t border-gray-100">
+                <div class="text-xs text-gray-400">
+                    <p>Thank you for your business!</p>
+                    <p>This is a computer-generated receipt.</p>
+                </div>
+                <div class="text-right text-xs font-semibold text-gray-400">
+                    <p>Powered by</p>
+                    <p class="text-gray-800 text-sm tracking-wide">Pixara Web Solutions</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unified Modal for Income, Expense & Transfer -->
+    <div id="txModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform transition-all">
+            <div class="flex justify-between items-center mb-5">
+                <h3 id="modalTitle" class="text-xl font-bold text-gray-800">Add Entry</h3>
+                <button type="button" onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            
+            <form id="txForm" class="space-y-4">
+                <input type="hidden" id="txType">
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Amount (₹)</label>
+                    <input type="number" step="0.01" id="txAmount" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                
+                <div id="categoryDiv">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Category / Heading</label>
+                    <select id="txCategory" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></select>
+                </div>
+
+                <div id="fundDiv">
+                    <label id="fundLabel" class="block text-sm font-medium text-gray-700 mb-1">Fund Account</label>
+                    <select id="txFund" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="Cash in Hand">Cash in Hand</option>
+                        <option value="AEPS Float">AEPS Float</option>
+                        <option value="Airtel Payments Bank">Airtel Payments Bank</option>
+                        <option value="Main Office Bank">Main Office Bank</option>
+                    </select>
+                </div>
+
+                <div id="toFundDiv" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Transfer TO Account</label>
+                    <select id="txToFund" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="Main Office Bank">Main Office Bank</option>
+                        <option value="Airtel Payments Bank">Airtel Payments Bank</option>
+                        <option value="AEPS Float">AEPS Float</option>
+                        <option value="Cash in Hand">Cash in Hand</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <input type="text" id="txDesc" required placeholder="Detail or client name..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+
+                <div class="pt-4 flex gap-3">
+                    <button type="button" onclick="closeModal()" class="flex-1 px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition">Cancel</button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition">Save Entry</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Success Acknowledgment Modal -->
+    <div id="successModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden flex items-center justify-center z-[60]">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center transform transition-all scale-100">
+            <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+                <i data-lucide="check-circle-2" class="h-8 w-8 text-green-600"></i>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">Success!</h3>
+            <p class="text-sm text-gray-500 mb-6">The entry has been securely saved to your cloud ledger.</p>
+            <button onclick="closeSuccessModal()" class="w-full inline-flex justify-center rounded-lg px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 transition">
+                OK
+            </button>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        lucide.createIcons();
+
+        // 1. SUPABASE INITIALIZATION
+        const SUPABASE_URL = 'https://piavaootjcxqhnfbjwrg.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_zErqObDJaEstS1A0r20JcQ_MMnzRpOU';
+        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let transactions = [];
+        let funds = [];
+        let privacyMode = true;
+        let internalCashBal = 0;
+        let internalAepsBal = 0;
+
+        const categories = {
+            income: ["Govt Portal Services", "PAN Applications", "Insurance Commission", "RTO & Docs", "Tech & Web Solutions", "Tax & Compliance GST", "Banking & AEPS", "Stationery & Printing", "Capital Injection"],
+            expense: ["Operating Expenses", "Maintenance & Infra", "Bills & Utilities", "AEPS Cash Float Replenishment", "Vendor Payouts", "Cash Variance Adjustment"]
+        };
+
+        const filterCatEl = document.getElementById('filterCategory');
+        categories.income.forEach(c => filterCatEl.insertAdjacentHTML('beforeend', `<option value="${c}">Inflow: ${c}</option>`));
+        categories.expense.forEach(c => filterCatEl.insertAdjacentHTML('beforeend', `<option value="${c}">Outflow: ${c}</option>`));
+
+        let barChartInstance = null;
+        let doughnutChartInstance = null;
+
+        // 2. VIEW SWITCHING
+        function switchView(viewId) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${viewId}`).classList.remove('hidden');
+            
+            document.querySelectorAll('#sidebarNav button').forEach(btn => {
+                btn.classList.remove('nav-active', 'text-blue-400');
+                btn.classList.add('text-gray-300');
+            });
+            const activeBtn = document.getElementById(`nav-${viewId}`);
+            activeBtn.classList.remove('text-gray-300');
+            activeBtn.classList.add('nav-active', 'text-blue-400');
+
+            document.getElementById('headerTitle').innerText = 
+                viewId === 'dashboard' ? 'Command Center' : 
+                viewId === 'today' ? 'Today\'s Performance' :
+                viewId === 'eod' ? 'EOD Cash Reconciliation' :
+                viewId === 'transactions' ? 'All Transactions' : 'Reports & Export';
+        }
+
+        // 3. PRIVACY TOGGLE
+        document.getElementById('togglePrivacyBtn').addEventListener('click', () => {
+            privacyMode = !privacyMode;
+            document.getElementById('privacyIcon').setAttribute('data-lucide', privacyMode ? 'eye-off' : 'eye');
+            document.getElementById('privacyText').innerText = privacyMode ? 'Reveal' : 'Hide';
+            lucide.createIcons();
+            updateUI();
+        });
+
+        function formatCurrency(amount) {
+            if (privacyMode) return '₹ ••••••';
+            return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
+        }
+
+        function getLocalDateString() {
+            const now = new Date();
+            const offset = now.getTimezoneOffset() * 60000;
+            return (new Date(now - offset)).toISOString().split('T')[0];
+        }
+
+        // 4. FETCH DATA
+        async function fetchInitialData() {
+            try {
+                const [txRes, fundsRes] = await Promise.all([
+                    db.from('transactions').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }),
+                    db.from('funds').select('*')
+                ]);
+                if (txRes.error) throw txRes.error;
+                if (fundsRes.error) throw fundsRes.error;
+
+                transactions = txRes.data;
+                funds = fundsRes.data;
+                updateUI();
+                initCharts();
+            } catch (error) {
+                console.error("Error fetching data:", error);
+            }
+        }
+
+        db.channel('custom-all-channel')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, payload => fetchInitialData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'funds' }, payload => fetchInitialData())
+            .subscribe();
+
+        // 5. UPDATE UI (Balances & Tables)
+        function updateUI() {
+            let totalCorpus = 0;
+            let cashMap = { 'Cash in Hand': 0, 'AEPS Float': 0, 'Airtel Payments Bank': 0, 'Main Office Bank': 0 };
+
+            funds.forEach(f => {
+                totalCorpus += parseFloat(f.balance);
+                if (cashMap[f.fund_name] !== undefined) cashMap[f.fund_name] = parseFloat(f.balance);
+            });
+
+            // Store for EOD comparison
+            internalCashBal = cashMap['Cash in Hand'];
+            internalAepsBal = cashMap['AEPS Float'];
+            document.getElementById('eod-expected-cash').innerText = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(internalCashBal);
+            document.getElementById('eod-expected-aeps').innerText = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(internalAepsBal);
+            calculateVariance('cash'); calculateVariance('aeps'); // Update running variances
+
+            document.getElementById('kpi-corpus').innerText = formatCurrency(totalCorpus);
+            document.getElementById('kpi-cash').innerText = formatCurrency(internalCashBal);
+            document.getElementById('kpi-aeps').innerText = formatCurrency(internalAepsBal);
+            document.getElementById('kpi-airtel').innerText = formatCurrency(cashMap['Airtel Payments Bank']);
+            document.getElementById('kpi-bank').innerText = formatCurrency(cashMap['Main Office Bank']);
+
+            // Today's Table
+            const todayStr = getLocalDateString();
+            let tInflow = 0, tOutflow = 0, tVolume = 0;
+            const todayTableBody = document.getElementById('todayTransactionsTable');
+            todayTableBody.innerHTML = '';
+            let todayTxs = 0;
+
+            transactions.forEach(tx => {
+                if(tx.date === todayStr) {
+                    todayTxs++;
+                    const amt = parseFloat(tx.amount);
+                    if(tx.type === 'income') tInflow += amt;
+                    if(tx.type === 'expense') tOutflow += amt;
+                    if(tx.type === 'transfer') tVolume += amt;
+
+                    const isIncome = tx.type === 'income';
+                    const amountClass = isIncome ? 'text-green-600' : tx.type === 'transfer' ? 'text-blue-600' : 'text-red-500';
+                    const displayFund = tx.type === 'transfer' ? `${tx.fund_account} → ${tx.to_fund_account}` : tx.fund_account;
+                    const receiptBtn = isIncome ? `<button onclick="generateReceipt('${tx.id}')" class="text-blue-500 hover:text-blue-700 mx-auto" title="Print Receipt"><i data-lucide="printer" class="w-4 h-4"></i></button>` : '-';
+
+                    todayTableBody.insertAdjacentHTML('beforeend', `
+                        <tr class="hover:bg-gray-50 transition border-b border-gray-50">
+                            <td class="px-6 py-4 text-sm font-medium text-gray-900">${tx.description}</td>
+                            <td class="px-6 py-4 text-sm"><span class="px-2 py-1 bg-gray-100 rounded-md text-gray-600 text-xs">${tx.heading}</span></td>
+                            <td class="px-6 py-4 text-sm text-gray-500">${displayFund}</td>
+                            <td class="px-6 py-4 text-sm font-bold text-right ${amountClass}">${isIncome ? '+' : tx.type === 'transfer' ? '↔' : '-'} ${formatCurrency(tx.amount)}</td>
+                            <td class="px-6 py-4 text-sm text-center flex justify-center">${receiptBtn}</td>
+                        </tr>
+                    `);
+                }
+            });
+
+            if(todayTxs === 0) todayTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-gray-400">No transactions recorded today.</td></tr>`;
+
+            document.getElementById('today-inflow').innerText = formatCurrency(tInflow);
+            document.getElementById('today-outflow').innerText = formatCurrency(tOutflow);
+            document.getElementById('today-net').innerText = formatCurrency(tInflow - tOutflow);
+            document.getElementById('today-volume').innerText = formatCurrency(tVolume);
+
+            renderTransactions();
+            updateCharts();
+        }
+
+        // 6. ALL TRANSACTIONS & PDF RECEIPT
+        function renderTransactions() {
+            const dateFilter = document.getElementById('filterDate').value;
+            const catFilter = document.getElementById('filterCategory').value;
+            const fundFilter = document.getElementById('filterFund').value;
+
+            const tableBody = document.getElementById('transactionsTable');
+            tableBody.innerHTML = '';
+
+            const filteredTxs = transactions.filter(tx => {
+                if (dateFilter && tx.date !== dateFilter) return false;
+                if (catFilter && tx.heading !== catFilter) return false;
+                if (fundFilter && tx.fund_account !== fundFilter && tx.to_fund_account !== fundFilter) return false;
+                return true;
+            });
+
+            if(filteredTxs.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-gray-500">No transactions found.</td></tr>`;
+                return;
+            }
+
+            filteredTxs.forEach(tx => {
+                const isIncome = tx.type === 'income';
+                const isTransfer = tx.type === 'transfer';
+                const displayFund = isTransfer ? `${tx.fund_account} → ${tx.to_fund_account}` : tx.fund_account;
+                const receiptBtn = isIncome ? `<button onclick="generateReceipt('${tx.id}')" class="text-blue-500 hover:text-blue-700" title="Print"><i data-lucide="printer" class="w-4 h-4"></i></button>` : '';
+                
+                tableBody.insertAdjacentHTML('beforeend', `
+                    <tr class="hover:bg-gray-50 border-b border-gray-50">
+                        <td class="px-6 py-4 text-sm">${new Date(tx.date).toLocaleDateString('en-IN')}</td>
+                        <td class="px-6 py-4 text-sm font-medium">${tx.description}</td>
+                        <td class="px-6 py-4 text-sm"><span class="px-2 py-1 bg-gray-100 rounded-md text-xs">${tx.heading}</span></td>
+                        <td class="px-6 py-4 text-sm text-gray-500">${displayFund}</td>
+                        <td class="px-6 py-4 text-sm font-bold text-right ${isIncome ? 'text-green-600' : isTransfer ? 'text-blue-600' : 'text-red-500'}">${isIncome ? '+' : isTransfer ? '↔' : '-'} ${formatCurrency(tx.amount)}</td>
+                        <td class="px-6 py-4 text-sm text-center flex justify-center gap-3">
+                            ${receiptBtn}
+                            <button onclick="deleteTx('${tx.id}', '${tx.type}', ${tx.amount}, '${tx.fund_account}', '${tx.to_fund_account}')" class="text-red-400 hover:text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </td>
+                    </tr>
+                `);
+            });
+            lucide.createIcons();
+        }
+
+        // Receipt PDF Logic
+        function generateReceipt(id) {
+            const tx = transactions.find(t => t.id === id);
+            if(!tx) return;
+
+            document.getElementById('rcpt-date').innerText = new Date(tx.date).toLocaleDateString('en-IN');
+            document.getElementById('rcpt-id').innerText = tx.id.substring(0, 8);
+            document.getElementById('rcpt-desc').innerText = tx.description;
+            document.getElementById('rcpt-cat').innerText = tx.heading;
+            document.getElementById('rcpt-amt').innerText = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(tx.amount);
+
+            const element = document.getElementById('receipt-content');
+            const opt = {
+                margin: 0,
+                filename: `DigitalCorner_Receipt_${tx.id.substring(0,6)}.pdf`,
+                image: { type: 'jpeg', quality: 1.0 },
+                html2canvas: { scale: 3, useCORS: true },
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save();
+        }
+
+        // Filters
+        ['filterDate', 'filterCategory', 'filterFund'].forEach(id => document.getElementById(id).addEventListener('change', renderTransactions));
+        function clearFilters() {
+            document.getElementById('filterDate').value = '';
+            document.getElementById('filterCategory').value = '';
+            document.getElementById('filterFund').value = '';
+            renderTransactions();
+        }
+
+        // 7. EOD RECONCILIATION LOGIC
+        function calculateVariance(type) {
+            const expected = type === 'cash' ? internalCashBal : internalAepsBal;
+            const inputVal = document.getElementById(`physical-${type}`).value;
+            const actual = inputVal === "" ? expected : parseFloat(inputVal); // default to 0 variance if empty
+            const variance = actual - expected;
+            
+            const varEl = document.getElementById(`var-${type}`);
+            varEl.innerText = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(variance);
+            
+            if (variance > 0) {
+                varEl.className = "px-3 py-1 rounded-md font-bold text-green-700 bg-green-100";
+                varEl.innerText = "+" + varEl.innerText;
+            } else if (variance < 0) {
+                varEl.className = "px-3 py-1 rounded-md font-bold text-red-700 bg-red-100";
+            } else {
+                varEl.className = "px-3 py-1 rounded-md font-bold text-gray-500 bg-gray-200";
+            }
+        }
+
+        async function settleVariances() {
+            const cashInput = document.getElementById('physical-cash').value;
+            const aepsInput = document.getElementById('physical-aeps').value;
+            
+            const cashActual = cashInput === "" ? internalCashBal : parseFloat(cashInput);
+            const aepsActual = aepsInput === "" ? internalAepsBal : parseFloat(aepsInput);
+            
+            const cashVar = cashActual - internalCashBal;
+            const aepsVar = aepsActual - internalAepsBal;
+
+            if (cashVar === 0 && aepsVar === 0) {
+                alert("Both drawers balance perfectly! EOD complete.");
+                return;
+            }
+
+            if(!confirm(`You have variances (Cash: ₹${cashVar}, AEPS: ₹${aepsVar}). Do you want to log these as adjustments?`)) return;
+
+            const date = getLocalDateString();
+            
+            try {
+                if (cashVar !== 0) {
+                    const type = cashVar > 0 ? 'income' : 'expense';
+                    await processTransaction(type, Math.abs(cashVar), "Cash Variance Adjustment", "Cash in Hand", null, "EOD Physical Count Adjustment", date);
+                }
+                if (aepsVar !== 0) {
+                    const type = aepsVar > 0 ? 'income' : 'expense';
+                    await processTransaction(type, Math.abs(aepsVar), "Cash Variance Adjustment", "AEPS Float", null, "EOD Physical Count Adjustment", date);
+                }
+                
+                document.getElementById('physical-cash').value = '';
+                document.getElementById('physical-aeps').value = '';
+                alert("EOD adjustments successfully logged.");
+            } catch (err) {
+                alert("Error saving EOD: " + err.message);
+            }
+        }
+
+        // 8. MODAL, SAVE & DELETE TRANSACTIONS
+        function openModal(type) {
+            document.getElementById('txForm').reset();
+            document.getElementById('txType').value = type;
+            const catDiv = document.getElementById('categoryDiv'), toFundDiv = document.getElementById('toFundDiv'), fLabel = document.getElementById('fundLabel');
+            
+            if (type === 'transfer') {
+                document.getElementById('modalTitle').innerText = 'Transfer Funds';
+                catDiv.classList.add('hidden'); toFundDiv.classList.remove('hidden'); fLabel.innerText = "Transfer FROM Account";
+                document.getElementById('txCategory').innerHTML = `<option value="Internal Transfer">Internal Transfer</option>`;
+            } else {
+                document.getElementById('modalTitle').innerText = type === 'income' ? 'Add Inflow' : 'Add Outflow';
+                catDiv.classList.remove('hidden'); toFundDiv.classList.add('hidden'); fLabel.innerText = "Fund Account";
+                document.getElementById('txCategory').innerHTML = categories[type].map(c => `<option value="${c}">${c}</option>`).join('');
+            }
+            document.getElementById('txModal').classList.remove('hidden');
+        }
+
+        function closeModal() { document.getElementById('txModal').classList.add('hidden'); }
+        function closeSuccessModal() { document.getElementById('successModal').classList.add('hidden'); }
+
+        async function processTransaction(type, amount, heading, fund_account, to_fund_account, description, date) {
+            const payload = { type, amount, heading, description, date, fund_account };
+            if (type === 'transfer') payload.to_fund_account = to_fund_account;
+            
+            const { error: txError } = await db.from('transactions').insert([payload]);
+            if (txError) throw txError;
+
+            const sourceFund = funds.find(f => f.fund_name === fund_account);
+            if (type === 'income') {
+                await db.from('funds').update({ balance: parseFloat(sourceFund.balance) + amount }).eq('id', sourceFund.id);
+            } else if (type === 'expense') {
+                await db.from('funds').update({ balance: parseFloat(sourceFund.balance) - amount }).eq('id', sourceFund.id);
+            } else if (type === 'transfer') {
+                const destFund = funds.find(f => f.fund_name === to_fund_account);
+                await db.from('funds').update({ balance: parseFloat(sourceFund.balance) - amount }).eq('id', sourceFund.id);
+                await db.from('funds').update({ balance: parseFloat(destFund.balance) + amount }).eq('id', destFund.id);
+            }
+        }
+
+        document.getElementById('txForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const type = document.getElementById('txType').value;
+            const amount = parseFloat(document.getElementById('txAmount').value);
+            const heading = document.getElementById('txCategory').value;
+            const fund_account = document.getElementById('txFund').value;
+            const to_fund_account = document.getElementById('txToFund').value;
+            const description = document.getElementById('txDesc').value;
+            const date = getLocalDateString(); 
+
+            if (type === 'transfer' && fund_account === to_fund_account) return alert("Cannot transfer to the same account!");
+
+            try {
+                await processTransaction(type, amount, heading, fund_account, to_fund_account, description, date);
+                closeModal();
+                document.getElementById('successModal').classList.remove('hidden');
+                lucide.createIcons();
+            } catch (err) {
+                alert("Error saving: " + err.message);
+            }
+        });
+
+        async function deleteTx(id, type, amount, fund, to_fund) {
+            if (!confirm("Delete transaction and reverse amounts?")) return;
+            try {
+                await db.from('transactions').delete().eq('id', id);
+                const sourceFund = funds.find(f => f.fund_name === fund);
+                if (type === 'income') await db.from('funds').update({ balance: parseFloat(sourceFund.balance) - amount }).eq('id', sourceFund.id);
+                else if (type === 'expense') await db.from('funds').update({ balance: parseFloat(sourceFund.balance) + amount }).eq('id', sourceFund.id);
+                else if (type === 'transfer') {
+                    const destFund = funds.find(f => f.fund_name === to_fund);
+                    await db.from('funds').update({ balance: parseFloat(sourceFund.balance) + amount }).eq('id', sourceFund.id);
+                    await db.from('funds').update({ balance: parseFloat(destFund.balance) - amount }).eq('id', destFund.id);
+                }
+            } catch (err) { alert("Failed to delete."); }
+        }
+
+        // 9. EXPORT CSV
+        function exportCSV() {
+            let csvContent = "Date,Type,Category,Source Fund,Destination Fund,Description,Amount\n";
+            transactions.forEach(tx => csvContent += [tx.date, tx.type, tx.heading, tx.fund_account, tx.to_fund_account || '', `"${tx.description}"`, tx.amount].join(",") + "\n");
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob); link.download = `Ledger_${getLocalDateString()}.csv`;
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+
+        // 10. CHARTS
+        function initCharts() {
+            if(barChartInstance) barChartInstance.destroy();
+            if(doughnutChartInstance) doughnutChartInstance.destroy();
+            Chart.defaults.font.family = 'Inter';
+            barChartInstance = new Chart(document.getElementById('barChart'), { type: 'bar', data: { labels: ['Total'], datasets: [] }, options: { responsive: true, maintainAspectRatio: false } });
+            doughnutChartInstance = new Chart(document.getElementById('doughnutChart'), { type: 'doughnut', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'right' } } } });
+            updateCharts();
+        }
+
+        function updateCharts() {
+            if (!barChartInstance) return;
+            let totalIncome = 0, totalExpense = 0, revenueBreakdown = {};
+            transactions.forEach(tx => {
+                if (tx.type === 'transfer') return;
+                const amt = parseFloat(tx.amount);
+                if (tx.type === 'income') { totalIncome += amt; revenueBreakdown[tx.heading] = (revenueBreakdown[tx.heading] || 0) + amt; }
+                else { totalExpense += amt; }
+            });
+            barChartInstance.data.datasets = [{ label: 'Inflow', data: [totalIncome], backgroundColor: '#10b981', borderRadius: 4 }, { label: 'Outflow', data: [totalExpense], backgroundColor: '#ef4444', borderRadius: 4 }];
+            barChartInstance.update();
+            doughnutChartInstance.data.labels = Object.keys(revenueBreakdown);
+            doughnutChartInstance.data.datasets = [{ data: Object.values(revenueBreakdown), backgroundColor: ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1', '#14b8a6', '#64748b'], borderWidth: 0 }];
+            doughnutChartInstance.update();
+        }
+
+        fetchInitialData();
+    </script>
+</body>
+</html>
