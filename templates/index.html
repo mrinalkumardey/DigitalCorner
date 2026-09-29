@@ -72,7 +72,7 @@
         .theme-toggle-btn.light-mode .theme-toggle-knob i { color: #f59e0b; }
     </style>
 </head>
-<body class="text-gray-800 dark:text-gray-100 flex h-screen overflow-hidden relative">
+<body class="text-gray-800 dark:text-gray-100 flex min-h-screen md:h-screen overflow-x-hidden relative"></body>
 
     <!-- Mobile Sidebar Overlay -->
     <div id="sidebarOverlay" onclick="toggleMobileMenu()" class="fixed inset-0 bg-gray-900/50 z-40 hidden md:hidden transition-opacity"></div>
@@ -108,7 +108,7 @@
     </aside>
 
     <!-- Main Content -->
-    <main class="flex-1 flex flex-col h-screen overflow-hidden">
+    <main class="flex-1 flex flex-col min-h-screen md:h-screen overflow-y-auto md:overflow-hidden"></main>
         <header class="bg-white border-b border-gray-200 px-4 md:px-8 py-4 flex justify-between items-center z-10 shrink-0">
             <div class="flex items-center gap-3">
                 <button onclick="toggleMobileMenu()" class="md:hidden text-gray-600 hover:text-gray-900 transition p-1 bg-gray-100 rounded-md">
@@ -176,8 +176,17 @@
             
             <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wide mt-6">Accurate Monthly Insights</h3>
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-1">
-                <div class="glass-panel p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2 h-[300px] md:h-[350px]"><h3 class="text-lg font-semibold text-gray-800 mb-4">This Month: Inflow vs Outflow</h3><canvas id="barChart"></canvas></div>
-                <div class="glass-panel p-6 rounded-2xl shadow-sm border border-gray-100 h-[300px] md:h-[350px]"><h3 class="text-lg font-semibold text-gray-800 mb-4">This Month: Revenue Breakdown</h3><canvas id="doughnutChart"></canvas></div>
+                <div class="glass-panel p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2 h-[300px] md:h-[350px]">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">This Month: Inflow vs Outflow</h3>
+                    <canvas id="barChart"></canvas>
+                </div>
+                <!-- FIXED DOUGHNUT CARD CONTAINER -->
+                <div class="glass-panel p-6 rounded-2xl shadow-sm border border-gray-100 h-[320px] md:h-[370px] flex flex-col">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2 shrink-0">This Month: Revenue Breakdown</h3>
+                    <div class="relative flex-1 w-full min-h-0">
+                        <canvas id="doughnutChart"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
 
