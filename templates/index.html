@@ -931,9 +931,15 @@
         // Global function for standard PDF downloads from modals
         window.currentPdfElement = null;
         window.currentPdfFilename = '';
-        window.downloadCurrentPDF = function() {
+       window.downloadCurrentPDF = function() {
             if(window.currentPdfElement && window.currentPdfFilename) {
-                html2pdf().set({ margin: 0, filename: window.currentPdfFilename, image: { type: 'jpeg', quality: 1.0 }, html2canvas: { scale: 3, useCORS: true, logging: false }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } }).from(window.currentPdfElement).save();
+                html2pdf().set({ 
+                    margin: 0, 
+                    filename: window.currentPdfFilename, 
+                    image: { type: 'jpeg', quality: 1.0 }, 
+                    html2canvas: { scale: 3, useCORS: true, logging: false, windowWidth: 800, width: 800 }, 
+                    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } 
+                }).from(window.currentPdfElement).save();
             }
         };
 
@@ -1213,7 +1219,13 @@
             document.getElementById('rcpt-items-body').innerHTML = `<tr class="border-b border-gray-100"><td class="py-4 px-4 text-gray-800 font-semibold text-lg">${descStr}</td><td class="py-4 px-4 text-gray-500 text-sm font-medium uppercase tracking-wide">${tx.heading}</td><td class="py-4 px-4 text-right font-bold text-gray-900 text-lg">${formatStandardCurrency(tx.amount)}</td></tr>`;
             document.getElementById('rcpt-total-amt').innerText = formatStandardCurrency(tx.amount);
 
-            html2pdf().set({ margin: 0, filename: `DigitalCorner_Receipt_${tx.id.substring(0,6)}.pdf`, image: { type: 'jpeg', quality: 1.0 }, html2canvas: { scale: 3, useCORS: true, logging: false }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } }).from(document.getElementById('receipt-content')).save();
+            html2pdf().set({ 
+                margin: 0, 
+                filename: `DigitalCorner_Receipt_${tx.id.substring(0,6)}.pdf`, 
+                image: { type: 'jpeg', quality: 1.0 }, 
+                html2canvas: { scale: 3, useCORS: true, logging: false, windowWidth: 800, width: 800 }, 
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } 
+            }).from(document.getElementById('receipt-content')).save();
         }
 
         // --- EOD RECONCILIATION ---
