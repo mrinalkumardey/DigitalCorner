@@ -176,9 +176,12 @@
             
             <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wide mt-6">Accurate Monthly Insights</h3>
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-1">
-                <div class="glass-panel p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2 h-[300px] md:h-[350px]">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">This Month: Inflow vs Outflow</h3>
-                    <canvas id="barChart"></canvas>
+                <!-- UPDATED BAR CHART CONTAINER -->
+                <div class="glass-panel p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2 h-[300px] md:h-[350px] flex flex-col">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 shrink-0">This Month: Inflow vs Outflow</h3>
+                    <div class="relative flex-1 w-full min-h-0">
+                        <canvas id="barChart"></canvas>
+                    </div>
                 </div>
                 <!-- FIXED DOUGHNUT CARD CONTAINER -->
                 <div class="glass-panel p-6 rounded-2xl shadow-sm border border-gray-100 h-[320px] md:h-[370px] flex flex-col">
@@ -350,6 +353,7 @@
                             <option value="CSC Wallet">CSC Wallet</option>
                         </select>
                         <button onclick="clearAllFilters()" class="text-sm text-blue-600 hover:text-blue-800 font-medium w-full md:w-auto md:ml-auto text-right">Clear All</button>
+                        <button onclick="downloadFilteredPDF()" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition shadow-sm w-full md:w-auto mt-2 md:mt-0"><i data-lucide="file-text" class="w-4 h-4"></i> PDF Report</button>
                     </div>
                     <!-- Quick Date Range Chips -->
                     <div class="flex gap-2 items-center flex-wrap md:pl-9 mt-2 md:mt-0">
@@ -481,6 +485,7 @@
         <h3 class="text-xl font-bold text-white tracking-wider" id="loadingMessage">Processing...</h3>
         <p class="text-blue-200 text-sm mt-2 animate-pulse">Syncing data with secure cloud ledger</p>
     </div>
+    
     <!-- Hidden Premium Itemized Receipt Template -->
     <div id="receipt-container">
         <div id="receipt-content" class="border border-gray-200 rounded-xl p-8 bg-white relative z-0">
@@ -521,9 +526,7 @@
                 
                 <!-- Stamp & Signature Overlay -->
                 <div class="absolute bottom-10 right-4 flex flex-col items-center opacity-90 pointer-events-none">
-                    <!-- The stamp sits in the background -->
                     <img src="/static/stamp.png" class="w-24 h-24 object-contain mix-blend-multiply" onerror="this.style.display='none'">
-                    <!-- The signature overlaps the stamp slightly -->
                     <img src="/static/sign.png" class="w-32 h-auto object-contain mix-blend-multiply mt-[-50px] z-10" onerror="this.style.display='none'">
                 </div>
 
@@ -531,6 +534,52 @@
                     <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Authorized Signatory</p>
                     <p class="text-gray-900 font-bold text-sm tracking-wide">Pixara Digital Corner</p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Report Template -->
+    <div id="report-container" style="width: 800px; padding: 40px; background: white; position: absolute; top: 0; left: 0; opacity: 0.01; pointer-events: none; z-index: -9999;">
+        <div id="report-content" class="bg-white">
+            <div class="flex justify-between items-end border-b-2 border-gray-800 pb-4 mb-6">
+                <div class="flex items-center gap-4">
+                    <img src="/static/logo.jpg" alt="Logo" class="h-12 w-12 object-contain rounded shadow-sm border border-gray-100" onerror="this.style.display='none'">
+                    <div>
+                        <h1 class="text-2xl font-black text-gray-900 tracking-tight">DIGITAL CORNER</h1>
+                        <p class="text-xs text-gray-500 font-medium mt-0.5 uppercase tracking-widest">Transaction Report</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm font-bold text-blue-600 uppercase" id="rpt-date-range">All Dates</p>
+                    <p class="text-[10px] text-gray-400 mt-1 font-mono">Generated: <span id="rpt-gen-date"></span></p>
+                </div>
+            </div>
+            <div class="mb-6 text-[11px] text-gray-600 bg-gray-50/50 p-3 rounded-lg border border-gray-100" id="rpt-filters">
+                <!-- Filters injected here -->
+            </div>
+            <table class="w-full text-left border-collapse mb-8 table-fixed">
+                <thead>
+                    <tr class="bg-gray-800 text-white text-[10px] uppercase tracking-wider">
+                        <th class="py-2 px-2 w-[15%] rounded-l">Date</th>
+                        <th class="py-2 px-2 w-[35%]">Description</th>
+                        <th class="py-2 px-2 w-[20%]">Category</th>
+                        <th class="py-2 px-2 w-[15%]">Fund Account</th>
+                        <th class="py-2 px-2 w-[15%] text-right rounded-r">Amount</th>
+                    </tr>
+                </thead>
+                <tbody id="rpt-items-body" class="text-xs divide-y divide-gray-100"></tbody>
+            </table>
+            
+            <div class="w-1/2 ml-auto mb-8 avoid-break">
+                <table class="w-full text-sm border-collapse">
+                    <tr class="border-b border-gray-100"><td class="py-2 text-gray-600 font-medium">Total Inflow</td><td class="py-2 text-right font-bold text-green-600" id="rpt-total-in">₹0</td></tr>
+                    <tr class="border-b border-gray-100"><td class="py-2 text-gray-600 font-medium">Total Outflow</td><td class="py-2 text-right font-bold text-red-500" id="rpt-total-out">₹0</td></tr>
+                    <tr class="border-b-2 border-gray-800"><td class="py-2 text-gray-800 font-bold uppercase tracking-wide">Net Change</td><td class="py-2 text-right font-black text-gray-900 text-lg" id="rpt-net">₹0</td></tr>
+                </table>
+            </div>
+
+            <div class="text-center pt-8 border-t border-gray-100 opacity-60 avoid-break">
+                <p class="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Generated Securely via Pixara Dashboard</p>
             </div>
         </div>
     </div>
@@ -574,11 +623,10 @@
 
         let internalCashBal = 0, internalAepsBal = 0;
         let editingTxId = null;
-        let debounceTimer;
 
         // Pagination Trackers
-        let searchPage = 1, searchHasMore = true, isSearchFetching = false;
-        let allPage = 1, allHasMore = true, isAllFetching = false;
+        let searchPage = 1, searchHasMore = true, currentSearchFetchId = 0;
+        let allPage = 1, allHasMore = true, currentAllFetchId = 0;
 
         const categories = {
             income: ["Govt Portal Services", "PAN Applications", "Insurance Commission", "RTO & Docs", "Tech & Web Solutions", "Tax & Compliance GST", "Banking & AEPS", "Stationery & Printing", "Capital Injection"],
@@ -728,11 +776,10 @@
         }
 
         async function renderAllTransactions(reset = false) {
-            if (isAllFetching) return;
-            isAllFetching = true;
-
+            const fetchId = ++currentAllFetchId;
+            
             if (reset) { allPage = 1; allHasMore = true; document.getElementById('transactionsTable').innerHTML = ''; }
-            if (!allHasMore) { isAllFetching = false; return; }
+            if (!allHasMore) return;
 
             const filters = { 
                 search: document.getElementById('searchAllQuery').value.trim(), 
@@ -747,6 +794,10 @@
 
             try {
                 const results = await fetchPaginatedData(allPage, filters);
+                
+                // If a new request was fired while we were waiting, drop this stale data!
+                if (fetchId !== currentAllFetchId) return;
+
                 const tableBody = document.getElementById('transactionsTable');
 
                 if (results.length === 0 && reset) {
@@ -765,7 +816,6 @@
                     else { allPage++; triggerCell.innerHTML = 'Scroll to load more'; }
                 }
             } catch (err) { triggerCell.innerHTML = 'Error loading data.'; }
-            isAllFetching = false;
         }
 
         function setQuickDate(type, btn) {
@@ -806,11 +856,10 @@
         }
 
         async function renderSearchInvoices(reset = false) {
-            if (isSearchFetching) return;
-            isSearchFetching = true;
-
+            const fetchId = ++currentSearchFetchId;
+            
             if (reset) { searchPage = 1; searchHasMore = true; document.getElementById('searchTransactionsTable').innerHTML = ''; }
-            if (!searchHasMore) { isSearchFetching = false; return; }
+            if (!searchHasMore) return;
 
             const query = document.getElementById('searchInvoiceQuery').value.trim();
             const tableBody = document.getElementById('searchTransactionsTable');
@@ -819,13 +868,15 @@
             if (!query && reset) {
                 tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-gray-500 text-base">Type above to instantly search through your generated invoices, client names, and transactions.</td></tr>`;
                 triggerCell.innerHTML = '';
-                searchHasMore = false; isSearchFetching = false; return;
+                searchHasMore = false; return;
             }
 
             triggerCell.innerHTML = `<span class="loader-spinner"></span> Fetching records...`;
 
             try {
                 const results = await fetchPaginatedData(searchPage, { search: query });
+                
+                if (fetchId !== currentSearchFetchId) return; // Drop stale data
 
                 if (results.length === 0 && reset) {
                     tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-gray-500 text-base">No results found for "<span class="font-bold">${query}</span>".</td></tr>`;
@@ -843,17 +894,17 @@
                     else { searchPage++; triggerCell.innerHTML = 'Scroll to load more'; }
                 }
             } catch (err) { triggerCell.innerHTML = 'Error loading data.'; }
-            isSearchFetching = false;
         }
 
         function clearSearchFilters() { document.getElementById('searchInvoiceQuery').value = ''; renderSearchInvoices(true); }
 
-        function handleDebounce(func, delay = 500) {
-            return function() { clearTimeout(debounceTimer); debounceTimer = setTimeout(() => func(true), delay); }
+        function createDebouncer(func, delay = 500) {
+            let timer;
+            return function() { clearTimeout(timer); timer = setTimeout(() => func(true), delay); }
         }
 
-        document.getElementById('searchAllQuery').addEventListener('input', handleDebounce(renderAllTransactions));
-        document.getElementById('searchInvoiceQuery').addEventListener('input', handleDebounce(renderSearchInvoices));
+        document.getElementById('searchAllQuery').addEventListener('input', createDebouncer(renderAllTransactions));
+        document.getElementById('searchInvoiceQuery').addEventListener('input', createDebouncer(renderSearchInvoices));
 
         ['filterStartDate', 'filterEndDate', 'filterCategory', 'filterFund'].forEach(id => {
             document.getElementById(id).addEventListener('change', () => {
@@ -919,9 +970,7 @@
             document.getElementById('invTotalAmount').value = total.toFixed(2);
         }
 
-        // UPDATED API CALL: Sends the entire array of transactions as a single payload to the database!
         async function safeApiCall(payloads) {
-            // Ensure payload is an array before sending
             if (!Array.isArray(payloads)) payloads = [payloads];
 
             const res = await fetch('/api/transaction', { 
@@ -937,11 +986,9 @@
             return res;
         }
 
-
-        // Global function for standard PDF downloads from modals
         window.currentPdfElement = null;
         window.currentPdfFilename = '';
-       window.downloadCurrentPDF = function() {
+        window.downloadCurrentPDF = function() {
             if(window.currentPdfElement && window.currentPdfFilename) {
                 html2pdf().set({ 
                     margin: 0, 
@@ -1000,12 +1047,13 @@
             const address = document.getElementById('invAddress').value.trim();
             const phone = document.getElementById('invPhone').value.trim();
             const fund = document.getElementById('invFund').value;
-            const invId = "INV-" + Date.now().toString().slice(-6);
+            
+            // Replaced insecure ID with UUID
+            const invId = "INV-" + crypto.randomUUID().split('-')[0].toUpperCase();
 
             let totalAmt = 0, htmlRows = '';
             const payloads = [];
 
-            // Format WhatsApp Text Header
             let waText = `🧾 *DIGITAL CORNER - PAYMENT RECEIPT*\n────────────────────────\n*Invoice No:* ${invId}\n*Date:* ${new Date(date).toLocaleDateString('en-IN')}\n*Customer:* ${client}\n`;
             if (address) { waText += `*Address:* ${address}\n`; }
             waText += `\n*Items / Services:*\n`;
@@ -1028,10 +1076,8 @@
                 }
             });
 
-            // Finish WA Text Footer
             waText += `────────────────────────\n*Total Paid:* ${formatStandardCurrency(totalAmt)}\n*Mode:* ${fund === 'Main Office Bank' ? 'UPI/Bank' : fund}\n\n📍 *Digital Corner*\nLaluk Bus Stand, Laluk, Assam - 784160\n📞 +91 8811008135\n\n_Powered by Pixara.in_`;
 
-            // Generate Hidden PDF Template
             document.getElementById('rcpt-date').innerText = new Date(date).toLocaleDateString('en-IN'); 
             document.getElementById('rcpt-id').innerText = invId; 
             document.getElementById('rcpt-client').innerText = client; 
@@ -1053,10 +1099,8 @@
 
             try {
                 showLoading("Saving Invoice Atomically...");
-                // Send the entire array at once!
                 await safeApiCall(payloads);
 
-                // Build Dynamic Success Modal Actions
                 document.getElementById('successModalDesc').innerText = "Invoice logged securely. How would you like to share the receipt?";
                 const actionsDiv = document.getElementById('successModalActions');
                 actionsDiv.innerHTML = ''; 
@@ -1099,7 +1143,6 @@
             }
         });
 
-        // --- STANDARD ADD/EDIT MODAL LOGIC ---
         function toggleModalCommission() {
             const cat = document.getElementById('txCategory').value, type = document.getElementById('txType').value, commDiv = document.getElementById('modalCommissionDiv');
             if (type === 'income' && doubleEntryCategories.includes(cat)) { commDiv.classList.remove('hidden'); } 
@@ -1129,7 +1172,8 @@
             if (tx.linked_id) {
                 try {
                     showLoading("Fetching linked data...");
-                    const res = await fetch(`/api/transactions?search=${tx.linked_id}`);
+                    // Updated to query exact linked_id
+                    const res = await fetch(`/api/transactions?linked_id=${tx.linked_id}`);
                     const data = await res.json();
                     const linkedOutflow = data.transactions.find(t => t.id !== tx.id && t.type === 'expense');
                     if (linkedOutflow) { 
@@ -1161,7 +1205,9 @@
                 }
             }
 
-            const linkId = "TXN-" + Date.now().toString().slice(-6);
+            // Replaced insecure ID with UUID
+            const linkId = "TXN-" + crypto.randomUUID().split('-')[0].toUpperCase();
+            
             const payloads = [];
             const mainPayload = { type: type, amount: amt, heading: heading, fund_account: fund, description: desc, date: date, linked_id: linkId };
             if (type === 'transfer') mainPayload.to_fund_account = toFund;
@@ -1174,14 +1220,19 @@
 
             try {
                 showLoading("Saving Entry Atomically...");
-                if (editingTxId) {
-                    const delRes = await fetch('/api/transaction/' + editingTxId, { method: 'DELETE' });
-                    if(!delRes.ok) throw new Error("Failed to reverse old transaction.");
-                    editingTxId = null;
-                }
                 
-                // Send the array!
-                await safeApiCall(payloads);
+                // Safe Branch for Edit vs Create
+                if (editingTxId) {
+                    const res = await fetch('/api/transaction/edit', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ old_id: editingTxId, transactions: payloads })
+                    });
+                    if(!res.ok) throw new Error("Failed to edit transaction safely.");
+                    editingTxId = null;
+                } else {
+                    await safeApiCall(payloads);
+                }
 
                 document.getElementById('successModalDesc').innerText = "Your ledger and balances have been updated securely.";
                 document.getElementById('successModalActions').innerHTML = `<button onclick="closeSuccessModal()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition">OK, Continue</button>`;
@@ -1240,7 +1291,6 @@
             }
 
             document.getElementById('rcpt-client').innerText = clientStr; 
-            // In a single-receipt generation from ledger, we don't have the explicit address stored separate from description. Hide the address field to keep it clean.
             document.getElementById('rcpt-address').classList.add('hidden');
 
             document.getElementById('rcpt-items-body').innerHTML = `<tr class="border-b border-gray-100"><td class="py-4 px-4 text-gray-800 font-semibold text-lg">${descStr}</td><td class="py-4 px-4 text-gray-500 text-sm font-medium uppercase tracking-wide">${tx.heading}</td><td class="py-4 px-4 text-right font-bold text-gray-900 text-lg">${formatStandardCurrency(tx.amount)}</td></tr>`;
@@ -1271,7 +1321,6 @@
             }).from(document.getElementById('receipt-content')).save();
         }
 
-        // --- EOD RECONCILIATION ---
         function calculateVariance(type) {
             const expected = type === 'cash' ? internalCashBal : internalAepsBal, val = document.getElementById(`physical-${type}`).value;
             const variance = (val === "" ? expected : parseFloat(val)) - expected, el = document.getElementById(`var-${type}`);
@@ -1321,20 +1370,24 @@
             }
         }
 
-        function getChartTextColor() { return document.documentElement.classList.contains('dark') ? '#cbd5e1' : '#374151'; }
+        function getChartTextColor() { return document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#374151'; }
         function getChartGridColor() { return document.documentElement.classList.contains('dark') ? '#334155' : '#e5e7eb'; }
 
         function updateChartTheme() {
             const textColor = getChartTextColor(), gridColor = getChartGridColor();
+            Chart.defaults.color = textColor; // Ensure global defaults match
+            
             [barChartInstance, doughnutChartInstance].forEach(chart => {
                 if (!chart) return;
-                chart.options.plugins = chart.options.plugins || {};
-                chart.options.plugins.legend = chart.options.plugins.legend || {};
-                chart.options.plugins.legend.labels = { color: textColor };
+                
+                if (chart.options.plugins && chart.options.plugins.legend && chart.options.plugins.legend.labels) {
+                    chart.options.plugins.legend.labels.color = textColor;
+                }
+                
                 if (chart.options.scales) {
                     Object.values(chart.options.scales).forEach(scale => {
-                        scale.ticks = { color: textColor };
-                        scale.grid = { color: gridColor };
+                        if (scale.ticks) scale.ticks.color = textColor;
+                        if (scale.grid) scale.grid.color = gridColor;
                     });
                 }
                 chart.update();
@@ -1344,8 +1397,32 @@
         function initCharts() {
             if(barChartInstance) barChartInstance.destroy(); if(doughnutChartInstance) doughnutChartInstance.destroy();
             const textColor = getChartTextColor(), gridColor = getChartGridColor();
-            barChartInstance = new Chart(document.getElementById('barChart'), { type: 'bar', data: { labels: ['Total'], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: textColor } } }, scales: { x: { ticks: { color: textColor }, grid: { color: gridColor } }, y: { ticks: { color: textColor }, grid: { color: gridColor } } } } });
-            doughnutChartInstance = new Chart(document.getElementById('doughnutChart'), { type: 'doughnut', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { labels: { color: textColor } } } } });
+            
+            Chart.defaults.color = textColor; // Apply color globally before rendering
+
+            barChartInstance = new Chart(document.getElementById('barChart'), { 
+                type: 'bar', 
+                data: { labels: ['Total'], datasets: [] }, 
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { labels: { color: textColor } } }, 
+                    scales: { 
+                        x: { ticks: { color: textColor }, grid: { color: gridColor } }, 
+                        y: { ticks: { color: textColor }, grid: { color: gridColor } } 
+                    } 
+                } 
+            });
+            doughnutChartInstance = new Chart(document.getElementById('doughnutChart'), { 
+                type: 'doughnut', 
+                data: { labels: [], datasets: [] }, 
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    cutout: '70%', 
+                    plugins: { legend: { labels: { color: textColor } } } 
+                } 
+            });
             updateCharts();
         }
 
@@ -1360,9 +1437,105 @@
             doughnutChartInstance.data.labels = Object.keys(monthlyStats.breakdown); 
             doughnutChartInstance.data.datasets = [{ 
                 data: Object.values(monthlyStats.breakdown), 
-                backgroundColor: ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1', '#14b8a6'] 
+                backgroundColor: ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1', '#14b8a6'],
+                borderColor: document.documentElement.classList.contains('dark') ? '#1e293b' : '#ffffff',
+                borderWidth: 2
             }]; 
             doughnutChartInstance.update();
+        }
+        async function downloadFilteredPDF() {
+            const filters = { 
+                search: document.getElementById('searchAllQuery').value.trim(), 
+                start_date: document.getElementById('filterStartDate').value,
+                end_date: document.getElementById('filterEndDate').value,
+                category: document.getElementById('filterCategory').value, 
+                fund: document.getElementById('filterFund').value 
+            };
+
+            try {
+                showLoading("Compiling PDF Report...");
+                // Fetch up to 10,000 records that match your exact filters
+                const params = new URLSearchParams({ page: 1, limit: 10000, ...filters });
+                const res = await fetch('/api/transactions?' + params.toString());
+                const data = await res.json();
+                const txs = data.transactions || [];
+
+                if(txs.length === 0) {
+                    hideLoading();
+                    return alert("No transactions found for the selected filters.");
+                }
+
+                // Populate Report Header
+                document.getElementById('rpt-gen-date').innerText = new Date().toLocaleString('en-IN');
+                
+                let dateStr = "All Time";
+                if(filters.start_date && filters.end_date) dateStr = `${new Date(filters.start_date).toLocaleDateString('en-IN')} to ${new Date(filters.end_date).toLocaleDateString('en-IN')}`;
+                else if(filters.start_date) dateStr = `From ${new Date(filters.start_date).toLocaleDateString('en-IN')}`;
+                else if(filters.end_date) dateStr = `Until ${new Date(filters.end_date).toLocaleDateString('en-IN')}`;
+                document.getElementById('rpt-date-range').innerText = dateStr;
+
+                // Populate active filters string
+                let filterStr = `<span><strong>Records:</strong> ${txs.length}</span>`;
+                if(filters.category) filterStr += `<span class="ml-4"><strong>Category:</strong> ${filters.category}</span>`;
+                if(filters.fund) filterStr += `<span class="ml-4"><strong>Fund:</strong> ${filters.fund}</span>`;
+                if(filters.search) filterStr += `<span class="ml-4"><strong>Search:</strong> "${filters.search}"</span>`;
+                document.getElementById('rpt-filters').innerHTML = filterStr;
+
+                // Populate Table Rows
+                let htmlRows = '', totalIn = 0, totalOut = 0;
+                txs.forEach(tx => {
+                    const isIncome = tx.type === 'income', isTransfer = tx.type === 'transfer';
+                    const amtClass = isIncome ? 'text-green-600' : isTransfer ? 'text-blue-600' : 'text-red-500';
+                    
+                    if (isIncome) totalIn += parseFloat(tx.amount);
+                    else if (tx.type === 'expense') totalOut += parseFloat(tx.amount);
+
+                    htmlRows += `
+                        <tr class="border-b border-gray-50">
+                            <td class="py-2 px-2 text-gray-600 whitespace-nowrap">${tx.date}</td>
+                            <td class="py-2 px-2 font-medium text-gray-900 truncate max-w-[250px]">${tx.description}</td>
+                            <td class="py-2 px-2 text-gray-500 text-[10px] leading-tight">${tx.heading}</td>
+                            <td class="py-2 px-2 text-gray-600 text-[10px] leading-tight truncate max-w-[150px]">${isTransfer ? tx.fund_account + ' &rarr; ' + tx.to_fund_account : tx.fund_account}</td>
+                            <td class="py-2 px-2 text-right font-bold ${amtClass}">${formatStandardCurrency(tx.amount)}</td>
+                        </tr>
+                    `;
+                });
+
+                // Populate Totals
+                document.getElementById('rpt-items-body').innerHTML = htmlRows;
+                document.getElementById('rpt-total-in').innerText = formatStandardCurrency(totalIn);
+                document.getElementById('rpt-total-out').innerText = formatStandardCurrency(totalOut);
+                document.getElementById('rpt-net').innerText = formatStandardCurrency(totalIn - totalOut);
+
+                // Initialize PDF Engine without height constraints so it captures multi-page tables natively
+                html2pdf().set({ 
+                    margin: 0.5,
+                    pagebreak: { avoid: ['tr', '.avoid-break'] },
+                    filename: `DigitalCorner_Report_${Date.now()}.pdf`, 
+                    image: { type: 'jpeg', quality: 0.98 }, 
+                    html2canvas: { 
+                        scale: 2, // Optimized scale for large document processing
+                        useCORS: true, 
+                        logging: false, 
+                        windowWidth: 800, 
+                        width: 800, 
+                        x: 0,
+                        y: 0,
+                        onclone: function(clonedDoc) {
+                            const container = clonedDoc.getElementById('report-container');
+                            container.style.opacity = '1';
+                            container.style.position = 'relative';
+                        }
+                    }, 
+                    jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } 
+                }).from(document.getElementById('report-content')).save().then(() => {
+                    hideLoading();
+                });
+
+            } catch(e) {
+                hideLoading();
+                alert("Error generating report: " + e.message);
+            }
         }
 
         addInvoiceItem();
