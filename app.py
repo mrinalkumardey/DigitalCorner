@@ -68,7 +68,6 @@ def login():
             return "Invalid credentials", 401
     return render_template('login.html')
 
-# SECURED: Changed to POST and uses session.clear()
 @app.route('/logout', methods=['POST'])
 def logout():
     session.clear()
@@ -98,7 +97,6 @@ def get_initial_data():
         stats_response = supabase.rpc('get_monthly_stats', {'month_prefix': current_month}).execute()
         monthly_stats = stats_response.data
         
-        # Guard against RPC returning a list instead of a dict
         if isinstance(monthly_stats, list) and len(monthly_stats) > 0:
             monthly_stats = monthly_stats[0]
         elif not monthly_stats:
@@ -116,8 +114,8 @@ def get_initial_data():
             "monthly_stats": monthly_stats
         }), 200
 
-    except Exception:
-        return jsonify({"error": "Failed to fetch dashboard data"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch dashboard data: {str(e)}"}), 500
 
 # -----------------------------------------------------------
 # 2. PAGINATED TRANSACTIONS & SEARCH
@@ -127,16 +125,14 @@ def get_initial_data():
 def get_transactions():
     try:
         page = max(int(request.args.get('page', 1)), 1)
-        limit = min(int(request.args.get('limit', 50)), 100000) # Allow large exports
+        limit = min(int(request.args.get('limit', 50)), 100000) 
     except ValueError:
         page, limit = 1, 50
 
-    # STRIP INJECTION VECTORS: remove commas and parentheses from search
     raw_search = request.args.get('search', '').strip()
     search_query = re.sub(r'[,()]', '', raw_search)
     linked_id = request.args.get('linked_id', '').strip()
     
-    # FUND WHITELIST CHECK
     raw_fund = request.args.get('fund', '').strip()
     fund = raw_fund if raw_fund in ALLOWED_FUNDS else ''
     
@@ -149,7 +145,6 @@ def get_transactions():
         return jsonify({"error": "Invalid filter date format"}), 400
 
     try:
-        # OPTIMIZED: Removed count='exact' to save DB execution time
         query = supabase.table('transactions').select('*')
 
         if linked_id:
@@ -170,15 +165,12 @@ def get_transactions():
         offset = (page - 1) * limit
         all_transactions = []
         
-        # AUTO-CHUNKING: Bypasses Supabase 1,000 row hard-limit for exports
         for i in range(0, limit, 1000):
             chunk_limit = min(1000, limit - i)
             chunk_offset = offset + i
             chunk_res = query.range(chunk_offset, chunk_offset + chunk_limit - 1).execute()
             
             all_transactions.extend(chunk_res.data)
-            
-            # If we returned fewer than 1000 rows, we've hit the end of the database
             if len(chunk_res.data) < chunk_limit:
                 break
         
@@ -186,8 +178,8 @@ def get_transactions():
             "transactions": all_transactions
         }), 200
 
-    except Exception:
-        return jsonify({"error": "Failed to fetch transactions"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch transactions: {str(e)}"}), 500
 
 # -----------------------------------------------------------
 # 3. CREATE TRANSACTIONS
@@ -207,8 +199,9 @@ def create_transaction():
     try:
         response = supabase.rpc('process_transaction_batch', {'transactions_data': transactions}).execute()
         return jsonify({"message": "Successfully created"}), 201
-    except Exception:
-        return jsonify({"error": "Failed to log transactions safely"}), 500
+    except Exception as e:
+        # UNMASKED: This will now show the exact Postgres RPC failure if it happens
+        return jsonify({"error": f"Database RPC Error: {str(e)}"}), 500
 
 # -----------------------------------------------------------
 # 4. ATOMIC EDIT TRANSACTION
@@ -233,8 +226,8 @@ def edit_transaction_atomic():
         }).execute()
         
         return jsonify({"message": "Transaction edited atomically"}), 200
-    except Exception:
-        return jsonify({"error": "Failed to execute atomic edit"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Failed to execute atomic edit: {str(e)}"}), 500
 
 # -----------------------------------------------------------
 # 5. ATOMIC DELETE TRANSACTION
@@ -248,8 +241,8 @@ def delete_transaction(id):
     try:
         supabase.rpc('delete_transaction_atomic', {'p_id': id}).execute()
         return jsonify({"message": "Successfully deleted atomically"}), 200
-    except Exception:
-        return jsonify({"error": "Failed to delete transaction"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Failed to delete transaction: {str(e)}"}), 500
 
 if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
