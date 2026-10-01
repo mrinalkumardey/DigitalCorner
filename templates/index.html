@@ -94,7 +94,12 @@
             <button onclick="switchView('transactions')" id="nav-transactions" class="text-gray-300 w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition hover:bg-gray-800 hover:text-white"><i data-lucide="arrow-right-left" class="w-5 h-5"></i> All Transactions</button>
             <button onclick="switchView('eod')" id="nav-eod" class="text-gray-300 w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition hover:bg-gray-800 hover:text-white"><i data-lucide="scale" class="w-5 h-5"></i> EOD Tally</button>
             <button onclick="switchView('reports')" id="nav-reports" class="text-gray-300 w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition hover:bg-gray-800 hover:text-white"><i data-lucide="pie-chart" class="w-5 h-5"></i> Reports & Export</button>
-            <a href="/logout" class="text-red-400 w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition hover:bg-gray-800 hover:text-red-300 mt-8 border border-gray-800"><i data-lucide="log-out" class="w-5 h-5"></i> Secure Logout</a>
+            
+            <form action="/logout" method="POST" class="mt-8">
+                <button type="submit" class="text-red-400 w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition hover:bg-gray-800 hover:text-red-300 border border-gray-800 outline-none">
+                    <i data-lucide="log-out" class="w-5 h-5"></i> Secure Logout
+                </button>
+            </form>
         </nav>
         
         <div class="p-4 border-t border-gray-800 flex flex-col items-center justify-center gap-2 mt-auto">
@@ -176,14 +181,12 @@
             
             <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wide mt-6">Accurate Monthly Insights</h3>
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-1">
-                <!-- UPDATED BAR CHART CONTAINER -->
                 <div class="glass-panel p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2 h-[300px] md:h-[350px] flex flex-col">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4 shrink-0">This Month: Inflow vs Outflow</h3>
                     <div class="relative flex-1 w-full min-h-0">
                         <canvas id="barChart"></canvas>
                     </div>
                 </div>
-                <!-- FIXED DOUGHNUT CARD CONTAINER -->
                 <div class="glass-panel p-6 rounded-2xl shadow-sm border border-gray-100 h-[320px] md:h-[370px] flex flex-col">
                     <h3 class="text-lg font-semibold text-gray-800 mb-2 shrink-0">This Month: Revenue Breakdown</h3>
                     <div class="relative flex-1 w-full min-h-0">
@@ -291,7 +294,6 @@
                         <div>
                             <label class="block text-sm font-bold text-gray-700 mb-1">Customer Payment To (Fund Account)</label>
                             <select id="invFund" required class="w-full px-4 py-3 border border-gray-300 rounded-lg outline-none focus:border-blue-500 transition shadow-sm font-bold text-green-700">
-                                <!-- STRICTLY LIMITED TO CUSTOMER FACING PAYMENT METHODS -->
                                 <option value="Cash in Hand">Cash in Hand (Counter)</option>
                                 <option value="Main Office Bank">Main Office Bank (UPI)</option>
                             </select>
@@ -355,7 +357,6 @@
                         <button onclick="clearAllFilters()" class="text-sm text-blue-600 hover:text-blue-800 font-medium w-full md:w-auto md:ml-auto text-right">Clear All</button>
                         <button onclick="downloadFilteredPDF()" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition shadow-sm w-full md:w-auto mt-2 md:mt-0"><i data-lucide="file-text" class="w-4 h-4"></i> PDF Report</button>
                     </div>
-                    <!-- Quick Date Range Chips -->
                     <div class="flex gap-2 items-center flex-wrap md:pl-9 mt-2 md:mt-0">
                         <button onclick="setQuickDate('today', this)" class="px-3 md:px-4 py-1 text-xs font-semibold bg-white border border-gray-300 text-gray-600 rounded-full hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 transition date-chip">Today</button>
                         <button onclick="setQuickDate('yesterday', this)" class="px-3 md:px-4 py-1 text-xs font-semibold bg-white border border-gray-300 text-gray-600 rounded-full hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 transition date-chip">Yesterday</button>
@@ -524,7 +525,6 @@
                     <p class="text-xs">For any queries, please whatsapp us at +91 8811008135.</p>
                 </div>
                 
-                <!-- Stamp & Signature Overlay -->
                 <div class="absolute bottom-10 right-4 flex flex-col items-center opacity-90 pointer-events-none">
                     <img src="/static/stamp.png" class="w-24 h-24 object-contain mix-blend-multiply" onerror="this.style.display='none'">
                     <img src="/static/sign.png" class="w-32 h-auto object-contain mix-blend-multiply mt-[-50px] z-10" onerror="this.style.display='none'">
@@ -795,7 +795,6 @@
             try {
                 const results = await fetchPaginatedData(allPage, filters);
                 
-                // If a new request was fired while we were waiting, drop this stale data!
                 if (fetchId !== currentAllFetchId) return;
 
                 const tableBody = document.getElementById('transactionsTable');
@@ -876,7 +875,7 @@
             try {
                 const results = await fetchPaginatedData(searchPage, { search: query });
                 
-                if (fetchId !== currentSearchFetchId) return; // Drop stale data
+                if (fetchId !== currentSearchFetchId) return;
 
                 if (results.length === 0 && reset) {
                     tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-gray-500 text-base">No results found for "<span class="font-bold">${query}</span>".</td></tr>`;
@@ -1048,7 +1047,6 @@
             const phone = document.getElementById('invPhone').value.trim();
             const fund = document.getElementById('invFund').value;
             
-            // Replaced insecure ID with UUID
             const invId = "INV-" + crypto.randomUUID().split('-')[0].toUpperCase();
 
             let totalAmt = 0, htmlRows = '';
@@ -1172,7 +1170,6 @@
             if (tx.linked_id) {
                 try {
                     showLoading("Fetching linked data...");
-                    // Updated to query exact linked_id
                     const res = await fetch(`/api/transactions?linked_id=${tx.linked_id}`);
                     const data = await res.json();
                     const linkedOutflow = data.transactions.find(t => t.id !== tx.id && t.type === 'expense');
@@ -1205,7 +1202,6 @@
                 }
             }
 
-            // Replaced insecure ID with UUID
             const linkId = "TXN-" + crypto.randomUUID().split('-')[0].toUpperCase();
             
             const payloads = [];
@@ -1221,7 +1217,6 @@
             try {
                 showLoading("Saving Entry Atomically...");
                 
-                // Safe Branch for Edit vs Create
                 if (editingTxId) {
                     const res = await fetch('/api/transaction/edit', {
                         method: 'POST',
@@ -1443,6 +1438,7 @@
             }]; 
             doughnutChartInstance.update();
         }
+
         async function downloadFilteredPDF() {
             const filters = { 
                 search: document.getElementById('searchAllQuery').value.trim(), 
