@@ -21,6 +21,20 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
 # Initialize Supabase Client
 url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
+from importlib.metadata import version
+
+print("DC_DIAGNOSTIC_V1", flush=True)
+print("Installed Supabase SDK:", version("supabase"), flush=True)
+print(
+    "Supabase configuration:",
+    {
+        "url_present": bool(url),
+        "key_present": bool(key),
+        "new_secret_format": bool(key and key.startswith("sb_secret_")),
+        "surrounding_whitespace": bool(key and key != key.strip()),
+    },
+    flush=True,
+)
 supabase: Client = create_client(url, key)
 
 ALLOWED_FUNDS = ["Cash in Hand", "AEPS Float", "Airtel Payments Bank", "Main Office Bank", "CSC Wallet"]
