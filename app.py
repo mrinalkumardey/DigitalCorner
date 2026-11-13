@@ -243,7 +243,8 @@ def delete_transaction(id):
         return jsonify({"message": "Successfully deleted atomically"}), 200
     except Exception as e:
         return jsonify({"error": f"Failed to delete transaction: {str(e)}"}), 500
-
+from gst_routes import init_gst
+init_gst(app, supabase, login_required, ALLOWED_FUNDS)
 if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     app.run(debug=debug_mode, port=5000)

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="/static/manifest.json"><meta name="theme-color" content="#1e293b">
+<title>{% block title %}Digital Corner{% endblock %}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+body{background:#f3f4f6;font-family:'Inter',sans-serif}
+.nav-active{background-color:rgba(37,99,235,.2);color:#60a5fa}
+#pdf-container{width:800px;padding:40px;background:#fff;position:absolute;top:0;left:0;opacity:.01;pointer-events:none;z-index:-9999}
+.loader-spinner{border:3px solid #f3f3f3;border-top:3px solid #3b82f6;border-radius:50%;width:20px;height:20px;animation:spin 1s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body class="min-h-screen md:flex">
+<aside class="w-full md:w-64 bg-gray-900 text-white md:min-h-screen flex md:flex-col shrink-0">
+  <div class="px-5 py-4 md:py-6 font-extrabold tracking-wide text-lg hidden md:block">DIGITAL CORNER</div>
+  <nav class="flex md:flex-col gap-1 md:gap-2 p-2 md:px-4 w-full overflow-x-auto">
+    <a href="/" class="text-gray-300 flex items-center gap-3 px-4 py-3 rounded-lg font-medium hover:bg-gray-800 whitespace-nowrap"><i data-lucide="layout-dashboard" class="w-5 h-5"></i> Dashboard</a>
+    <a href="/gst-invoice" class="{{ 'nav-active' if active=='gst' else 'text-gray-300' }} flex items-center gap-3 px-4 py-3 rounded-lg font-medium hover:bg-gray-800 whitespace-nowrap"><i data-lucide="file-check" class="w-5 h-5"></i> GST Invoice</a>
+    <a href="/settings" class="{{ 'nav-active' if active=='settings' else 'text-gray-300' }} flex items-center gap-3 px-4 py-3 rounded-lg font-medium hover:bg-gray-800 whitespace-nowrap"><i data-lucide="settings" class="w-5 h-5"></i> Settings</a>
+  </nav>
+</aside>
+<main class="flex-1 p-4 md:p-8 overflow-y-auto">{% block content %}{% endblock %}</main>
+<div id="toast" class="fixed bottom-6 right-6 hidden px-5 py-3 rounded-xl text-white font-semibold shadow-lg z-50"></div>
+<script>
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function toast(msg,ok=true){const t=document.getElementById('toast');t.textContent=msg;t.className='fixed bottom-6 right-6 px-5 py-3 rounded-xl text-white font-semibold shadow-lg z-50 '+(ok?'bg-green-600':'bg-red-600');setTimeout(()=>t.classList.add('hidden'),4500)}
+function today(){const n=new Date();return new Date(n-n.getTimezoneOffset()*60000).toISOString().split('T')[0]}
+const inr=n=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
+</script>
+{% block scripts %}{% endblock %}
+<script>lucide.createIcons();</script>
+</body></html>

@@ -94,6 +94,8 @@
             <button onclick="switchView('transactions')" id="nav-transactions" class="text-gray-300 w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition hover:bg-gray-800 hover:text-white"><i data-lucide="arrow-right-left" class="w-5 h-5"></i> All Transactions</button>
             <button onclick="switchView('eod')" id="nav-eod" class="text-gray-300 w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition hover:bg-gray-800 hover:text-white"><i data-lucide="scale" class="w-5 h-5"></i> EOD Tally</button>
             <button onclick="switchView('reports')" id="nav-reports" class="text-gray-300 w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition hover:bg-gray-800 hover:text-white"><i data-lucide="pie-chart" class="w-5 h-5"></i> Reports & Export</button>
+            <a href="/gst-invoice" class="text-gray-300 w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition hover:bg-gray-800 hover:text-white"><i data-lucide="file-check" class="w-5 h-5"></i> GST Invoice</a>
+            <a href="/settings" class="text-gray-300 w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition hover:bg-gray-800 hover:text-white"><i data-lucide="settings" class="w-5 h-5"></i> Settings</a>
             
             <form action="/logout" method="POST" class="mt-8">
                 <button type="submit" class="text-red-400 w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition hover:bg-gray-800 hover:text-red-300 border border-gray-800 outline-none">
@@ -629,7 +631,7 @@
         let allPage = 1, allHasMore = true, currentAllFetchId = 0;
 
         const categories = {
-            income: ["Govt Portal Services", "PAN Applications", "Insurance Commission", "RTO & Docs", "Tech & Web Solutions", "Tax & Compliance GST", "Banking & AEPS", "Stationery & Printing", "Capital Injection"],
+            income: ["Govt Portal Services", "PAN Applications", "Insurance Commission", "RTO & Docs", "Tech & Web Solutions", "Tax & Compliance GST", "Banking & AEPS", "Stationery & Printing", "Service Fees", "Capital Injection"],
             expense: ["Operating Expenses", "Maintenance & Infra", "Bills & Utilities", "AEPS Cash Float Replenishment", "Vendor Payouts", "Owner's Draw", "Cash Variance Adjustment"]
         };
 

@@ -1,0 +1,18 @@
+{% extends "gst_base.html" %}
+{% block title %}Settings - Digital Corner{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold text-gray-800 mb-6">Settings</h1>
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+  <a href="/settings/gst-items" class="block bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md hover:border-blue-400 transition">
+    <div class="w-12 h-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center mb-4"><i data-lucide="package" class="w-6 h-6"></i></div>
+    <h2 class="text-lg font-bold text-gray-800">Goods &amp; Services</h2>
+    <p class="text-sm text-gray-500 mt-1">Add, edit or remove the products and services you invoice, with their HSN/SAC codes.</p>
+  </a>
+  <a href="/settings/gst-rates" class="block bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md hover:border-blue-400 transition">
+    <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4"><i data-lucide="percent" class="w-6 h-6"></i></div>
+    <h2 class="text-lg font-bold text-gray-800">GST Rate Configuration</h2>
+    <p class="text-sm text-gray-500 mt-1">Manage HSN/SAC codes, descriptions, GST rates and effective dates.</p>
+  </a>
+  <!-- Future tools: copy a card above and change href/title/description -->
+</div>
+{% endblock %}

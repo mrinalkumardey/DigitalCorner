@@ -1,0 +1,300 @@
+{% extends "gst_base.html" %}
+{% block title %}GST Invoice - Digital Corner{% endblock %}
+{% block content %}
+<style>#pdf-container{width:794px !important;padding:0 !important}</style>
+<h1 class="text-2xl font-bold text-gray-800 mb-1">GST Tax Invoice</h1>
+<p class="text-sm text-gray-500 mb-6">{{ supplier.name }} &middot; GSTIN {{ supplier.gstin }} &middot; Fully paid bills only</p>
+
+<form id="gstForm" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-8 space-y-6 max-w-5xl">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div><label class="block text-sm font-bold text-gray-700 mb-1">Invoice date</label><input id="invDate" type="date" required class="w-full px-3 py-2 border rounded-lg"></div>
+    <div><label class="block text-sm font-bold text-gray-700 mb-1">Sale / supply date</label><input id="supDate" type="date" required class="w-full px-3 py-2 border rounded-lg"><p class="text-[11px] text-gray-400 mt-1">Decides which GST rate applies.</p></div>
+    <div><label class="block text-sm font-bold text-gray-700 mb-1">Prices entered are</label>
+      <select id="priceMode" class="w-full px-3 py-2 border rounded-lg font-semibold"><option value="exclusive">GST exclusive (add GST on top)</option><option value="inclusive">GST inclusive (GST already in price)</option></select></div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div><label class="block text-sm font-bold text-gray-700 mb-1">Customer name</label><input id="cName" required maxlength="150" class="w-full px-3 py-2 border rounded-lg"></div>
+    <div><label class="block text-sm font-bold text-gray-700 mb-1">Customer GSTIN <span class="font-normal text-gray-400">(optional)</span></label><input id="cGstin" maxlength="15" class="w-full px-3 py-2 border rounded-lg uppercase" placeholder="Leave blank for unregistered"></div>
+    <div class="md:col-span-2"><label class="block text-sm font-bold text-gray-700 mb-1">Customer address <span class="font-normal text-gray-400">(optional)</span></label><input id="cAddr" maxlength="300" class="w-full px-3 py-2 border rounded-lg"></div>
+    <div><label class="block text-sm font-bold text-gray-700 mb-1">WhatsApp no. <span class="font-normal text-gray-400">(optional)</span></label><input id="cPhone" maxlength="20" class="w-full px-3 py-2 border rounded-lg"></div>
+    <div><label class="block text-sm font-bold text-gray-700 mb-1">Place of supply</label>
+      <select id="pos" class="w-full px-3 py-2 border rounded-lg">{% for code,name in states.items() %}<option value="{{ code }}" {{ 'selected' if code=='18' }}>{{ code }} - {{ name }}</option>{% endfor %}</select>
+      <p id="taxKind" class="text-[11px] text-gray-500 mt-1"></p></div>
+  </div>
+
+  <div>
+    <h3 class="text-sm font-bold text-gray-700 mb-2">Items</h3>
+    <div id="items" class="space-y-3"></div>
+    <button type="button" id="addItem" class="mt-3 text-sm font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100">+ Add another item</button>
+    <p class="text-[11px] text-gray-400 mt-2">Products and services are managed in Settings &rarr; Goods &amp; Services.</p>
+  </div>
+
+  <div class="bg-gray-50 border rounded-xl p-4 grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+    <div><div class="text-xs text-gray-500">Taxable value</div><div id="tTax" class="font-bold">-</div></div>
+    <div><div class="text-xs text-gray-500">CGST</div><div id="tC" class="font-bold">-</div></div>
+    <div><div class="text-xs text-gray-500">SGST</div><div id="tS" class="font-bold">-</div></div>
+    <div><div class="text-xs text-gray-500">IGST</div><div id="tI" class="font-bold">-</div></div>
+    <div><div class="text-xs text-gray-500">Invoice total</div><div id="tAll" class="font-extrabold text-green-700 text-lg">-</div></div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+    <div><label class="block text-sm font-bold text-gray-700 mb-1">Payment received into</label>
+      <select id="fund" class="w-full px-3 py-2 border rounded-lg font-semibold text-green-700">{% for f in funds %}<option>{{ f }}</option>{% endfor %}</select></div>
+    <label class="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-3 cursor-pointer">
+      <input type="checkbox" id="fullyPaid" class="mt-1 w-5 h-5"><span class="text-sm font-semibold text-amber-900">Full payment has been received for this bill. <span class="font-normal">(Required - GST invoices are issued for fully paid bills only.)</span></span></label>
+  </div>
+
+  <div class="border rounded-xl p-4 bg-blue-50/50">
+    <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" id="sync" checked class="w-5 h-5"><span class="font-bold text-gray-800">Sync</span>
+      <span class="text-sm text-gray-600">Post this sale to the dashboard ledger. Uncheck if it is already recorded.</span></label>
+    <div id="syncOff" class="hidden mt-3">
+      <p class="text-sm font-semibold text-amber-800 mb-2">This GST invoice will be saved, but no income, expense or fund-balance entries will be created.</p>
+      <input id="exRef" maxlength="100" class="w-full px-3 py-2 border rounded-lg" placeholder="Existing receipt / transaction reference (optional, e.g. INV-1A2B3C4D)">
+    </div>
+  </div>
+
+  <button id="issueBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg transition">Issue GST Invoice</button>
+</form>
+
+<div id="doneBox" class="hidden max-w-5xl mt-6 bg-green-50 border border-green-200 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-3">
+  <div><div class="font-bold text-green-800">Invoice issued: <span id="doneNo" class="font-mono"></span></div><div id="doneMsg" class="text-sm text-green-700"></div></div>
+  <div class="flex gap-2"><button id="doneDl" class="bg-green-600 text-white font-bold px-5 py-2 rounded-lg">Download PDF</button><a id="doneWa" target="_blank" class="hidden bg-[#25D366] text-white font-bold px-5 py-2 rounded-lg">WhatsApp</a></div>
+</div>
+
+<h2 class="text-lg font-bold text-gray-800 mt-10 mb-3">Issued GST invoices</h2>
+<div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-x-auto max-w-5xl">
+  <table class="w-full text-sm text-left"><thead class="bg-gray-800 text-white text-xs uppercase"><tr><th class="px-4 py-3">Invoice no.</th><th class="px-4 py-3">Date</th><th class="px-4 py-3">Customer</th><th class="px-4 py-3 text-right">Total</th><th class="px-4 py-3">Ledger</th><th class="px-4 py-3"></th></tr></thead>
+  <tbody id="register"></tbody></table>
+</div>
+
+<div id="pdf-container"><div id="pdf-content"></div></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SUPPLIER={{ supplier|tojson }}, DOUBLE=new Set({{ double_entry|tojson }}), FUNDS={{ funds|tojson }};
+let CATS={services:[],goods:[]}, CATALOG=[], requestId=crypto.randomUUID(), submitting=false;
+const $=id=>document.getElementById(id);
+const round2=x=>Math.round((x+Number.EPSILON)*100)/100;
+const TYPE_LABEL={services:'Services (SAC)',goods:'Goods (HSN)'};
+
+function calc(qty,price,rate,mode,inter){
+  const base=round2(qty*price); let taxable,gst,total;
+  if(mode==='exclusive'){taxable=base;gst=round2(taxable*rate/100);total=round2(taxable+gst)}
+  else{total=base;taxable=round2(total*100/(100+rate));gst=round2(total-taxable)}
+  let c=0,s=0,i=0; if(inter)i=gst; else{c=round2(gst/2);s=round2(gst-c)}
+  return {taxable,c,s,i,total};
+}
+
+/* ---------- catalogue-driven selectors: type -> category -> item ---------- */
+async function loadCatalogue(){
+  const r=await fetch('/api/gst/catalogue?as_of='+($('supDate').value||today())); const d=await r.json();
+  if(!r.ok) return toast(d.error||'Could not load items',false);
+  CATS=d.categories; CATALOG=d.items;
+  document.querySelectorAll('.item').forEach(row=>fillCats(row,true)); recalc();
+}
+function fillCats(row,keep){
+  const t=row.querySelector('.it-type').value, sel=row.querySelector('.it-cat'), prev=sel.value;
+  const list=CATS[t]||[];
+  sel.innerHTML=(list.length===1?'':'<option value="">Select category</option>')+list.map(c=>`<option>${esc(c)}</option>`).join('');
+  if(keep && list.includes(prev)) sel.value=prev;
+  fillItems(row,keep);
+}
+function fillItems(row,keep){
+  const t=row.querySelector('.it-type').value, c=row.querySelector('.it-cat').value, sel=row.querySelector('.it-item'), prev=sel.value;
+  const list=CATALOG.filter(i=>i.item_type===t&&i.category===c);
+  sel.innerHTML='<option value="">'+(c?'Select item':'Select category first')+'</option>'+list.map(i=>`<option value="${esc(i.id)}" ${i.rate==null?'disabled':''}>${esc(i.name)} - ${esc(i.hsn_sac)}${i.rate==null?' (no rate set)':''}</option>`).join('');
+  if(keep && list.some(i=>i.id===prev)) sel.value=prev;
+  else if(list.length===1 && list[0].rate!=null){sel.value=list[0].id; applyItem(row,true)}
+  applyItem(row,false);
+}
+function applyItem(row,setDesc){
+  const it=CATALOG.find(i=>i.id===row.querySelector('.it-item').value);
+  row.querySelector('.it-code').textContent=it?`${it.item_type==='goods'?'HSN':'SAC'} ${it.hsn_sac} - GST ${it.rate}%`:'-';
+  if(it && setDesc) row.querySelector('.item-desc').value=it.name;
+}
+function addItem(){
+  const d=document.createElement('div'); d.className='item grid grid-cols-1 md:grid-cols-12 gap-2 p-3 border rounded-xl bg-gray-50';
+  d.innerHTML=`
+   <select class="it-type md:col-span-3 px-3 py-2 border rounded-lg font-semibold"><option value="services">${TYPE_LABEL.services}</option><option value="goods">${TYPE_LABEL.goods}</option></select>
+   <select class="it-cat md:col-span-4 px-3 py-2 border rounded-lg"></select>
+   <select class="it-item md:col-span-5 px-3 py-2 border rounded-lg" required></select>
+   <input class="item-desc md:col-span-5 px-3 py-2 border rounded-lg" placeholder="Description on invoice (editable)" maxlength="200" required>
+   <div class="it-code md:col-span-3 flex items-center text-xs font-bold text-gray-600">-</div>
+   <input class="item-qty md:col-span-1 px-3 py-2 border rounded-lg" type="number" min="0.001" step="any" value="1" placeholder="Qty" required>
+   <input class="item-price md:col-span-3 px-3 py-2 border rounded-lg" type="number" min="0.01" step="0.01" placeholder="Unit price" required>
+   <div class="item-total md:col-span-8 flex items-center text-sm font-bold text-gray-700">-</div>
+   <button type="button" class="item-del md:col-span-4 text-red-600 text-sm font-bold hover:underline text-right">Remove</button>
+   <div class="item-cost-row hidden md:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-2 pt-2 border-t border-dashed">
+     <input class="item-cost px-3 py-2 border rounded-lg" type="number" min="0" step="0.01" placeholder="Portal / vendor cost (optional, posted as expense)">
+     <select class="item-cost-fund px-3 py-2 border rounded-lg">${FUNDS.map(f=>`<option>${esc(f)}</option>`).join('')}</select></div>`;
+  $('items').appendChild(d);
+  d.querySelector('.it-type').addEventListener('change',()=>{fillCats(d,false);recalc()});
+  d.querySelector('.it-cat').addEventListener('change',()=>{fillItems(d,false);recalc()});
+  d.querySelector('.it-item').addEventListener('change',()=>{applyItem(d,true);recalc()});
+  d.querySelector('.item-del').onclick=()=>{ if(document.querySelectorAll('.item').length>1){d.remove();recalc()} };
+  d.querySelectorAll('input').forEach(e=>e.addEventListener('input',recalc));
+  fillCats(d,false); recalc();
+}
+function recalc(){
+  const inter=$('pos').value!==SUPPLIER.state_code, mode=$('priceMode').value, sync=$('sync').checked;
+  $('taxKind').textContent=inter?'Inter-state supply: IGST applies.':'Intra-state supply: CGST + SGST apply.';
+  let T=0,C=0,S=0,I=0,A=0;
+  document.querySelectorAll('.item').forEach(row=>{
+    const it=CATALOG.find(x=>x.id===row.querySelector('.it-item').value);
+    const q=parseFloat(row.querySelector('.item-qty').value), p=parseFloat(row.querySelector('.item-price').value);
+    row.querySelector('.item-cost-row').classList.toggle('hidden',!(sync && it && DOUBLE.has(it.category)));
+    if(it&&it.rate!=null&&q>0&&p>0){const r=calc(q,p,parseFloat(it.rate),mode,inter);T+=r.taxable;C+=r.c;S+=r.s;I+=r.i;A+=r.total;row.querySelector('.item-total').textContent=`${inr(r.total)}  (GST ${it.rate}%)`}
+    else row.querySelector('.item-total').textContent='-';
+  });
+  $('tTax').textContent=inr(T);$('tC').textContent=inr(C);$('tS').textContent=inr(S);$('tI').textContent=inr(I);$('tAll').textContent=inr(A);
+  $('syncOff').classList.toggle('hidden',sync);
+}
+
+/* ---------- number to words (Indian system) ---------- */
+function words(n){
+  const a=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+  const b=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+  const two=x=>x<20?a[x]:b[Math.floor(x/10)]+(x%10?' '+a[x%10]:'');
+  const three=x=>(x>99?a[Math.floor(x/100)]+' Hundred'+(x%100?' ':''):'')+(x%100?two(x%100):'');
+  let r=Math.floor(n), p=Math.round((n-r)*100), out=[];
+  const cr=Math.floor(r/1e7); r%=1e7; const lk=Math.floor(r/1e5); r%=1e5; const th=Math.floor(r/1e3); r%=1e3;
+  if(cr)out.push(three(cr)+' Crore'); if(lk)out.push(two(lk)+' Lakh'); if(th)out.push(two(th)+' Thousand'); if(r)out.push(three(r));
+  let s=(out.join(' ')||'Zero')+' Rupees'; if(p)s+=' and '+two(p)+' Paise'; return s+' Only';
+}
+
+/* ---------- PDF: A4, self-contained styles (no Tailwind), rendered from the SAVED invoice ---------- */
+const ASSETS={logo:'',stamp:'',sign:''};
+function firstLoadable(urls){
+  return urls.reduce((p,u)=>p.then(found=>found||new Promise(res=>{const i=new Image();i.onload=()=>res(u);i.onerror=()=>res('');i.src=u})),Promise.resolve(''));
+}
+async function loadAssets(){
+  ASSETS.logo=await firstLoadable(['/static/logo.jpg','/static/logo.png']);
+  ASSETS.stamp=await firstLoadable(['/static/stamp.png','/static/stamp.jpg']);
+  ASSETS.sign=await firstLoadable(['/static/sign.png','/static/sign.jpg']);
+}
+function imagesReady(root){
+  return Promise.all([...root.querySelectorAll('img')].map(img=>img.complete&&img.naturalWidth?1:new Promise(res=>{img.onload=img.onerror=res})));
+}
+function fmtDate(s){return new Date(s+'T00:00:00').toLocaleDateString('en-IN')}
+const PDF_CSS=`
+#pdf-sheet{width:794px;min-height:1120px;box-sizing:border-box;padding:34px 38px 30px;background:#fff;color:#1f2937;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.45;display:flex;flex-direction:column}
+#pdf-sheet *{box-sizing:border-box}
+#pdf-sheet .pd-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1e3a8a;padding-bottom:14px}
+#pdf-sheet .pd-brand{display:flex;align-items:center}
+#pdf-sheet .pd-brand img{height:78px;width:auto;margin-right:14px}
+#pdf-sheet h1{margin:0;font-size:26px;font-weight:800;color:#111827;letter-spacing:.5px}
+#pdf-sheet p{margin:0}
+#pdf-sheet .muted{color:#4b5563}
+#pdf-sheet .pd-title{text-align:right}
+#pdf-sheet h2{margin:0 0 6px;font-size:22px;font-weight:800;color:#1d4ed8;letter-spacing:2px;text-transform:uppercase}
+#pdf-sheet .pd-boxes{display:flex;justify-content:space-between;margin-top:16px}
+#pdf-sheet .pd-box{width:49%;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px 12px}
+#pdf-sheet .pd-label{font-size:9px;font-weight:700;color:#9ca3af;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:3px}
+#pdf-sheet table.pd-items{width:100%;table-layout:fixed;border-collapse:collapse;margin-top:18px;font-size:11px}
+#pdf-sheet .pd-items th{background:#1f2937;color:#fff;font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;padding:8px 6px;text-align:left}
+#pdf-sheet .pd-items td{padding:9px 6px;border-bottom:1px solid #e5e7eb;vertical-align:top;word-wrap:break-word}
+#pdf-sheet .r{text-align:right}
+#pdf-sheet .pd-sum{display:flex;justify-content:space-between;margin-top:16px}
+#pdf-sheet table.pd-tot{width:290px;border-collapse:collapse;font-size:12px}
+#pdf-sheet .pd-tot td{padding:4px 0}
+#pdf-sheet .pd-tot tr.grand td{border-top:2px solid #1f2937;padding-top:8px;font-size:17px;font-weight:800}
+#pdf-sheet .pd-main{flex:1}
+#pdf-sheet .pd-foot{display:flex;justify-content:space-between;align-items:flex-end;border-top:1px solid #e5e7eb;padding-top:14px;margin-top:24px}
+#pdf-sheet .pd-sign{text-align:center;width:250px}
+#pdf-sheet .pd-seals{display:flex;justify-content:center;align-items:center;height:96px}
+#pdf-sheet .pd-seals img{margin:0 6px}
+`;
+function pdfHtml(v){
+  const inter=v.is_inter_state;
+  const rows=v.items.map((it,i)=>`<tr><td>${i+1}</td><td style="font-weight:700">${esc(it.description)}</td><td>${esc(it.hsn_sac)}</td><td class="r">${esc(+it.quantity)}</td><td class="r">${inr(it.unit_price)}</td><td class="r">${inr(it.taxable_value)}</td><td class="r">${esc(+it.gst_rate)}%</td><td class="r">${inter?'IGST<br>'+inr(it.igst):'CGST '+inr(it.cgst)+'<br>SGST '+inr(it.sgst)}</td><td class="r" style="font-weight:700">${inr(it.line_total)}</td></tr>`).join('');
+  const taxRows=inter?`<tr><td class="muted">IGST</td><td class="r">${inr(v.total_igst)}</td></tr>`:`<tr><td class="muted">CGST</td><td class="r">${inr(v.total_cgst)}</td></tr><tr><td class="muted">SGST</td><td class="r">${inr(v.total_sgst)}</td></tr>`;
+  return `<div id="pdf-sheet"><style>${PDF_CSS}</style>
+   <div class="pd-main">
+    <div class="pd-head">
+      <div class="pd-brand">${ASSETS.logo?`<img src="${ASSETS.logo}">`:''}
+        <div><h1>DIGITAL CORNER</h1><p class="muted">Laluk Bus Stand, Laluk</p><p class="muted">North Lakhimpur, Assam, 784160</p>
+        <p class="muted">Phone: ${esc(SUPPLIER.phone)}</p><p style="font-weight:700;color:#111827;margin-top:3px">GSTIN: ${esc(v.supplier_gstin)}</p></div></div>
+      <div class="pd-title"><h2>Tax Invoice</h2>
+        <p style="font-weight:700">Invoice No: ${esc(v.invoice_no)}</p><p style="font-weight:700">Date: ${fmtDate(v.invoice_date)}</p>
+        <p class="muted">Reverse charge: ${esc(v.reverse_charge)}</p></div>
+    </div>
+    <div class="pd-boxes">
+      <div class="pd-box"><div class="pd-label">Billed to</div><p style="font-size:14px;font-weight:800;text-transform:uppercase">${esc(v.customer_name)}</p>
+        ${v.customer_address?`<p class="muted" style="margin-top:2px">${esc(v.customer_address)}</p>`:''}
+        ${v.customer_gstin?`<p style="font-weight:700;margin-top:2px">GSTIN: ${esc(v.customer_gstin)}</p>`:''}</div>
+      <div class="pd-box"><div class="pd-label">Supply details</div>
+        <p>Place of supply: <b>${esc(v.place_of_supply)} (${esc(v.place_of_supply_code)})</b></p>
+        <p>Date of supply: ${fmtDate(v.supply_date)}</p>
+        <p>Payment received into: ${esc(v.payment_fund==='Main Office Bank'?'UPI/Bank':v.payment_fund)}</p></div>
+    </div>
+    <table class="pd-items"><colgroup><col style="width:4%"><col style="width:27%"><col style="width:9%"><col style="width:6%"><col style="width:11%"><col style="width:12%"><col style="width:7%"><col style="width:12%"><col style="width:12%"></colgroup>
+      <thead><tr><th>#</th><th>Description</th><th>HSN/SAC</th><th class="r">Qty</th><th class="r">Unit price</th><th class="r">Taxable</th><th class="r">GST</th><th class="r">Tax</th><th class="r">Amount</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    <div class="pd-sum">
+      <div style="width:56%"><p style="font-weight:700;color:#111827">Amount in words</p><p class="muted">${esc(words(+v.total_amount))}</p>
+        <p class="muted" style="margin-top:10px;font-size:10.5px">Prices were entered ${v.price_mode==='inclusive'?'inclusive':'exclusive'} of GST. Payment received in full.</p></div>
+      <table class="pd-tot"><tbody><tr><td class="muted">Taxable value</td><td class="r">${inr(v.total_taxable)}</td></tr>${taxRows}
+        <tr class="grand"><td>TOTAL</td><td class="r">${inr(v.total_amount)}</td></tr></tbody></table>
+    </div>
+   </div>
+   <div class="pd-foot">
+     <div style="width:55%"><p style="font-weight:700;color:#111827;margin-bottom:3px">Thank you for your business!</p>
+       <p class="muted" style="font-size:10.5px">Declaration: We declare that this invoice shows the actual price of the goods/services described and that all particulars are true and correct.</p>
+       <p class="muted" style="font-size:10.5px;margin-top:4px">This is a computer-generated tax invoice. Queries: WhatsApp ${esc(SUPPLIER.phone)}.</p></div>
+     <div class="pd-sign"><p style="font-size:10.5px;font-weight:700">For DIGITAL CORNER</p>
+       <div class="pd-seals">${ASSETS.stamp?`<img src="${ASSETS.stamp}" style="height:90px;width:auto">`:''}${ASSETS.sign?`<img src="${ASSETS.sign}" style="height:52px;width:auto">`:''}</div>
+       <p style="border-top:1px solid #9ca3af;padding-top:4px;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px">Authorized Signatory</p></div>
+   </div></div>`;
+}
+async function downloadPdf(v){
+  try{
+    if(!ASSETS.logo&&!ASSETS.stamp&&!ASSETS.sign) await loadAssets();
+    $('pdf-content').innerHTML=pdfHtml(v);
+    await imagesReady($('pdf-content'));
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    await html2pdf().set({margin:0,filename:`${v.invoice_no.replace(/\//g,'-')}.pdf`,image:{type:'jpeg',quality:0.98},
+      html2canvas:{scale:3,useCORS:true,logging:false,backgroundColor:'#ffffff',windowWidth:794,x:0,y:0,scrollX:0,scrollY:0,
+        onclone:d=>{const c=d.getElementById('pdf-container');c.style.opacity='1';c.style.position='relative';c.style.zIndex='0'}},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['tr','.pd-sum','.pd-foot']}}).from($('pdf-sheet')).save();
+  }catch(e){console.error(e);toast('Could not create the PDF',false)}
+}
+
+async function loadRegister(){
+  const r=await fetch('/api/gst/invoices'); const d=await r.json(); if(!r.ok) return;
+  $('register').innerHTML=d.invoices.map(x=>`<tr class="border-b"><td class="px-4 py-3 font-mono font-bold">${esc(x.invoice_no)}</td><td class="px-4 py-3">${esc(x.invoice_date)}</td><td class="px-4 py-3">${esc(x.customer_name)}</td><td class="px-4 py-3 text-right font-bold">${inr(x.total_amount)}</td><td class="px-4 py-3">${x.sync_to_dashboard?'<span class="text-green-700 font-bold text-xs">Synced</span>':'<span class="text-gray-500 font-bold text-xs">Not synced</span>'}</td><td class="px-4 py-3 text-right"><button data-id="${esc(x.id)}" class="reprint text-blue-600 font-bold text-xs hover:underline">Download PDF</button></td></tr>`).join('')||'<tr><td colspan="6" class="px-4 py-6 text-center text-gray-400">No GST invoices issued yet.</td></tr>';
+  document.querySelectorAll('.reprint').forEach(b=>b.onclick=async()=>{const r=await fetch('/api/gst/invoice/'+b.dataset.id);const d=await r.json();r.ok?downloadPdf(d.invoice):toast(d.error||'Failed',false)});
+}
+
+$('gstForm').addEventListener('submit',async e=>{
+  e.preventDefault(); if(submitting) return;
+  if(!$('fullyPaid').checked) return toast('Confirm that full payment has been received.',false);
+  const items=[...document.querySelectorAll('.item')].map(r=>({item_id:r.querySelector('.it-item').value,description:r.querySelector('.item-desc').value.trim(),quantity:r.querySelector('.item-qty').value,unit_price:r.querySelector('.item-price').value,cost_amount:r.querySelector('.item-cost').value,cost_fund:r.querySelector('.item-cost-fund').value}));
+  if(items.some(i=>!i.item_id)) return toast('Select an item for every line.',false);
+  const sync=$('sync').checked;
+  if(!sync && !confirm('Sync is OFF. The dashboard will NOT be updated. Continue?')) return;
+  const body={request_id:requestId,invoice_date:$('invDate').value,supply_date:$('supDate').value,price_mode:$('priceMode').value,customer_name:$('cName').value,customer_gstin:$('cGstin').value,customer_address:$('cAddr').value,customer_phone:$('cPhone').value,place_of_supply_code:$('pos').value,payment_fund:$('fund').value,fully_paid:true,sync,existing_reference:$('exRef').value,items};
+  submitting=true; $('issueBtn').disabled=true; $('issueBtn').innerHTML='<span class="loader-spinner"></span> Issuing...';
+  try{
+    const r=await fetch('/api/gst/invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json(); if(!r.ok) throw new Error(d.error||'Failed');
+    const v=d.invoice; requestId=crypto.randomUUID();
+    $('doneNo').textContent=v.invoice_no; $('doneMsg').textContent=v.sync_to_dashboard?'Saved and posted to the dashboard.':'Saved. Dashboard not updated (Sync off).';
+    $('doneBox').classList.remove('hidden'); $('doneDl').onclick=()=>downloadPdf(v);
+    const ph=(v.customer_phone||'').replace(/\D/g,'');
+    if(ph.length>=10){$('doneWa').href=`https://wa.me/91${ph.slice(-10)}?text=${encodeURIComponent(`Digital Corner - Tax Invoice ${v.invoice_no}\nAmount paid: ${inr(v.total_amount)}\nGSTIN: ${v.supplier_gstin}`)}`;$('doneWa').classList.remove('hidden')}else $('doneWa').classList.add('hidden');
+    downloadPdf(v); loadRegister(); e.target.reset(); init(); toast('GST invoice issued');
+  }catch(err){toast(err.message,false)} finally{submitting=false;$('issueBtn').disabled=false;$('issueBtn').textContent='Issue GST Invoice'}
+});
+
+function init(){
+  $('invDate').value=today(); $('supDate').value=today(); $('sync').checked=true;
+  $('items').innerHTML=''; addItem(); recalc();
+}
+['pos','priceMode','sync'].forEach(id=>$(id).addEventListener('input',recalc));
+$('supDate').addEventListener('change',loadCatalogue);
+$('addItem').onclick=addItem;
+init(); loadCatalogue(); loadRegister(); loadAssets();
+</script>
+{% endblock %}

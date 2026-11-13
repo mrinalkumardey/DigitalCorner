@@ -1,0 +1,50 @@
+{% extends "gst_base.html" %}
+{% block title %}GST Rate Configuration - Digital Corner{% endblock %}
+{% block content %}
+<a href="/settings" class="text-sm text-blue-600 font-semibold">&larr; Settings</a>
+<h1 class="text-2xl font-bold text-gray-800 mt-1 mb-1">GST Rate Configuration</h1>
+<p class="text-sm text-gray-500 mb-6">Rates are effective-dated. To change a rate, add a new row with the new effective date. Old rows stay for history and issued invoices are never altered.</p>
+
+<form id="rateForm" class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
+  <div><label class="block text-xs font-bold text-gray-600 mb-1">HSN / SAC</label><input id="fHsn" required pattern="\d{4,8}" class="w-full px-3 py-2 border rounded-lg" placeholder="e.g. 998314"></div>
+  <div><label class="block text-xs font-bold text-gray-600 mb-1">Type</label><select id="fType" class="w-full px-3 py-2 border rounded-lg"><option value="services">Services</option><option value="goods">Goods</option></select></div>
+  <div class="md:col-span-2"><label class="block text-xs font-bold text-gray-600 mb-1">Description</label><input id="fDesc" required maxlength="200" class="w-full px-3 py-2 border rounded-lg"></div>
+  <div><label class="block text-xs font-bold text-gray-600 mb-1">Total GST %</label><input id="fRate" type="number" step="0.01" min="0" max="100" required class="w-full px-3 py-2 border rounded-lg"></div>
+  <div><label class="block text-xs font-bold text-gray-600 mb-1">Effective from</label><input id="fDate" type="date" required class="w-full px-3 py-2 border rounded-lg"></div>
+  <div class="md:col-span-6 flex items-center justify-between"><p class="text-xs text-gray-500">Entering an existing code adds a new rate version for it.</p><button class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2 rounded-lg">Save rate</button></div>
+</form>
+
+<div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-x-auto">
+  <table class="w-full text-sm text-left">
+    <thead class="bg-gray-800 text-white text-xs uppercase"><tr>
+      <th class="px-4 py-3">HSN/SAC</th><th class="px-4 py-3">Type</th><th class="px-4 py-3">Description</th>
+      <th class="px-4 py-3 text-right">GST %</th><th class="px-4 py-3">Effective from</th><th class="px-4 py-3">Status</th><th class="px-4 py-3"></th></tr></thead>
+    <tbody id="rateBody"></tbody>
+  </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let TODAY=today();
+async function load(){
+  const r=await fetch('/api/gst/rates/all'); const d=await r.json();
+  if(!r.ok) return toast(d.error||'Failed',false);
+  TODAY=d.today;
+  const currentIds=new Set(); const seen=new Set();
+  d.rates.forEach(x=>{ if(x.is_active && x.effective_from<=TODAY && !seen.has(x.hsn_sac)){seen.add(x.hsn_sac);currentIds.add(x.id);} });
+  document.getElementById('rateBody').innerHTML=d.rates.map(x=>{
+    const cur=currentIds.has(x.id), fut=x.effective_from>TODAY;
+    const badge=!x.is_active?'<span class="px-2 py-1 rounded bg-gray-100 text-gray-500 text-xs font-bold">Inactive</span>':cur?'<span class="px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-bold">Current</span>':fut?'<span class="px-2 py-1 rounded bg-amber-100 text-amber-700 text-xs font-bold">Scheduled</span>':'<span class="px-2 py-1 rounded bg-gray-100 text-gray-500 text-xs font-bold">Superseded</span>';
+    return `<tr class="border-b"><td class="px-4 py-3 font-mono font-bold">${esc(x.hsn_sac)}</td><td class="px-4 py-3 capitalize">${esc(x.item_type)}</td><td class="px-4 py-3">${esc(x.description)}</td><td class="px-4 py-3 text-right font-bold">${esc(x.rate)}%</td><td class="px-4 py-3">${esc(x.effective_from)}</td><td class="px-4 py-3">${badge}</td><td class="px-4 py-3 text-right"><button data-id="${esc(x.id)}" class="tgl text-xs font-bold text-blue-600 hover:underline">${x.is_active?'Deactivate':'Activate'}</button></td></tr>`}).join('');
+  document.querySelectorAll('.tgl').forEach(b=>b.onclick=async()=>{const r=await fetch(`/api/gst/rates/${b.dataset.id}/toggle`,{method:'POST'});r.ok?load():toast('Update failed',false)});
+}
+document.getElementById('rateForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const body={hsn_sac:fHsn.value.trim(),item_type:fType.value,description:fDesc.value.trim(),rate:fRate.value,effective_from:fDate.value};
+  const r=await fetch('/api/gst/rates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d=await r.json();
+  if(r.ok){toast('Rate saved');e.target.reset();load()}else toast(d.error||'Failed',false);
+});
+load();
+</script>
+{% endblock %}

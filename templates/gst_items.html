@@ -1,0 +1,75 @@
+{% extends "gst_base.html" %}
+{% block title %}Goods & Services - Digital Corner{% endblock %}
+{% block content %}
+<a href="/settings" class="text-sm text-blue-600 font-semibold">&larr; Settings</a>
+<h1 class="text-2xl font-bold text-gray-800 mt-1 mb-1">Goods &amp; Services</h1>
+<p class="text-sm text-gray-500 mb-5">These items appear in the GST Invoice selector. The GST rate comes from GST Rate Configuration, matched by HSN/SAC code.</p>
+
+<div class="flex gap-2 mb-5">
+  <button id="tabServices" class="tab px-5 py-2 rounded-lg font-bold text-sm">Services (SAC)</button>
+  <button id="tabGoods" class="tab px-5 py-2 rounded-lg font-bold text-sm">Goods (HSN)</button>
+</div>
+
+<form id="itemForm" class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+  <div><label class="block text-xs font-bold text-gray-600 mb-1">Category</label><select id="fCat" class="w-full px-3 py-2 border rounded-lg"></select></div>
+  <div class="md:col-span-2"><label class="block text-xs font-bold text-gray-600 mb-1">Item name</label><input id="fName" required maxlength="150" class="w-full px-3 py-2 border rounded-lg" placeholder="e.g. Website Development"></div>
+  <div><label class="block text-xs font-bold text-gray-600 mb-1" id="codeLabel">SAC</label><input id="fCode" required pattern="\d{4,8}" class="w-full px-3 py-2 border rounded-lg" placeholder="e.g. 998314"></div>
+  <div class="flex items-end gap-2"><button class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-lg" id="saveBtn">Add item</button><button type="button" id="cancelEdit" class="hidden px-4 py-2 rounded-lg border font-bold">Cancel</button></div>
+</form>
+
+<div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-x-auto">
+  <table class="w-full text-sm text-left">
+    <thead class="bg-gray-800 text-white text-xs uppercase"><tr><th class="px-4 py-3">Category</th><th class="px-4 py-3">Item</th><th class="px-4 py-3">HSN/SAC</th><th class="px-4 py-3 text-right">GST %</th><th class="px-4 py-3">Status</th><th class="px-4 py-3"></th></tr></thead>
+    <tbody id="body"></tbody>
+  </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const CATS={{ categories|tojson }};
+let ITEMS=[], tab='services', editingId=null;
+const $=id=>document.getElementById(id);
+
+function setTab(t){
+  tab=t; cancelEdit();
+  $('tabServices').className='tab px-5 py-2 rounded-lg font-bold text-sm '+(t==='services'?'bg-blue-600 text-white':'bg-white border text-gray-600');
+  $('tabGoods').className='tab px-5 py-2 rounded-lg font-bold text-sm '+(t==='goods'?'bg-blue-600 text-white':'bg-white border text-gray-600');
+  $('codeLabel').textContent=t==='goods'?'HSN':'SAC';
+  $('fCat').innerHTML=CATS[t].map(c=>`<option>${esc(c)}</option>`).join('');
+  render();
+}
+function render(){
+  const rows=ITEMS.filter(i=>i.item_type===tab);
+  $('body').innerHTML=rows.map(i=>{
+    const rate=i.rate==null?'<span class="text-red-600 font-bold text-xs">No rate set</span>':`<b>${esc(i.rate)}%</b>`;
+    const st=i.is_active?'<span class="px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-bold">Active</span>':'<span class="px-2 py-1 rounded bg-gray-100 text-gray-500 text-xs font-bold">Hidden</span>';
+    return `<tr class="border-b"><td class="px-4 py-3">${esc(i.category)}</td><td class="px-4 py-3 font-semibold">${esc(i.name)}</td><td class="px-4 py-3 font-mono font-bold">${esc(i.hsn_sac)}</td><td class="px-4 py-3 text-right">${rate}</td><td class="px-4 py-3">${st}</td>
+      <td class="px-4 py-3 text-right whitespace-nowrap"><button data-a="edit" data-id="${esc(i.id)}" class="act text-blue-600 font-bold text-xs mr-3 hover:underline">Edit</button><button data-a="tgl" data-id="${esc(i.id)}" class="act text-gray-600 font-bold text-xs mr-3 hover:underline">${i.is_active?'Hide':'Show'}</button><button data-a="del" data-id="${esc(i.id)}" class="act text-red-600 font-bold text-xs hover:underline">Delete</button></td></tr>`}).join('')||'<tr><td colspan="6" class="px-4 py-6 text-center text-gray-400">No items yet.</td></tr>';
+  document.querySelectorAll('.act').forEach(b=>b.onclick=()=>act(b.dataset.a,b.dataset.id));
+}
+async function load(){
+  const r=await fetch('/api/gst/items'); const d=await r.json();
+  if(!r.ok) return toast(d.error||'Failed',false);
+  ITEMS=d.items; render();
+}
+function cancelEdit(){editingId=null;$('itemForm').reset();$('saveBtn').textContent='Add item';$('cancelEdit').classList.add('hidden')}
+$('cancelEdit').onclick=cancelEdit;
+async function act(a,id){
+  const it=ITEMS.find(x=>x.id===id); if(!it) return;
+  if(a==='edit'){editingId=id;$('fCat').value=it.category;$('fName').value=it.name;$('fCode').value=it.hsn_sac;$('saveBtn').textContent='Update item';$('cancelEdit').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'})}
+  if(a==='tgl'){const r=await fetch(`/api/gst/items/${id}/toggle`,{method:'POST'});r.ok?load():toast('Update failed',false)}
+  if(a==='del'){ if(!confirm(`Delete "${it.name}"? Invoices already issued are not affected.`)) return;
+    const r=await fetch(`/api/gst/items/${id}`,{method:'DELETE'}); const d=await r.json(); r.ok?(toast('Item deleted'),load()):toast(d.error||'Failed',false)}
+}
+$('itemForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const body={item_type:tab,category:$('fCat').value,name:$('fName').value.trim(),hsn_sac:$('fCode').value.trim()};
+  const url=editingId?`/api/gst/items/${editingId}`:'/api/gst/items';
+  const r=await fetch(url,{method:editingId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d=await r.json();
+  if(r.ok){toast(d.warning||(editingId?'Item updated':'Item added'),!d.warning);cancelEdit();load()}else toast(d.error||'Failed',false);
+});
+$('tabServices').onclick=()=>setTab('services'); $('tabGoods').onclick=()=>setTab('goods');
+setTab('services'); load();
+</script>
+{% endblock %}
