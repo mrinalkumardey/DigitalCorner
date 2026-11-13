@@ -1,0 +1,14 @@
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+file.env
+
+# Python virtual environments and generated files
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Local Vercel configuration
+.vercel/
