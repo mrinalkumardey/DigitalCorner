@@ -12,3 +12,6 @@ __pycache__/
 
 # Local Vercel configuration
 .vercel/
+
+# Original design assets kept locally
+/asset/
